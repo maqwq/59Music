@@ -83,7 +83,7 @@
 </template>
 
 <script setup>
-import { onMounted, computed } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { VideoPlay } from '@element-plus/icons-vue'
 import { usePlayerStore } from '../stores/player'
