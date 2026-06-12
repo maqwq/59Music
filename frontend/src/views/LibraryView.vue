@@ -35,6 +35,17 @@
       </div>
     </div>
 
+    <!-- 批量操作栏 -->
+    <div v-if="selectedSongs.length > 0" class="batch-toolbar">
+      <span class="batch-info">已选择 {{ selectedSongs.length }} 首歌曲</span>
+      <el-button type="primary" @click="handleAddSelectedToQueue">
+        加入队列
+      </el-button>
+      <el-button type="danger" @click="handleDeleteSelected">
+        删除
+      </el-button>
+    </div>
+
     <!-- 歌曲表格 -->
     <el-table
       v-loading="libraryStore.loading"
@@ -42,7 +53,9 @@
       stripe
       style="width: 100%"
       @row-dblclick="handlePlay"
+      @selection-change="handleSelectionChange"
     >
+      <el-table-column type="selection" width="55" />
       <el-table-column prop="title" label="歌名" min-width="180" />
       <el-table-column prop="artist" label="歌手" min-width="140" />
       <el-table-column prop="album" label="专辑" min-width="160" />
@@ -86,11 +99,18 @@ const playerStore = usePlayerStore()
 
 const scanPath = ref('')
 const searchKeyword = ref('')
+const selectedSongs = ref([])
 
 onMounted(() => {
   libraryStore.loadSongs()
   libraryStore.loadStats()
 })
+
+// ===== 选择变化 =====
+
+function handleSelectionChange(selection) {
+  selectedSongs.value = selection
+}
 
 // ===== 事件处理 =====
 
@@ -148,6 +168,39 @@ async function handleDelete(song) {
   }
 }
 
+async function handleAddSelectedToQueue() {
+  const ids = selectedSongs.value.map((song) => song.id)
+  if (ids.length === 0) return
+  try {
+    await addToQueue(ids)
+    await playerStore.refreshQueue()
+    ElMessage.success(`已将 ${ids.length} 首歌曲加入队列`)
+  } catch {
+    ElMessage.error('加入队列失败')
+  }
+}
+
+async function handleDeleteSelected() {
+  const count = selectedSongs.value.length
+  if (count === 0) return
+  try {
+    await ElMessageBox.confirm(
+      `确定从音乐库删除选中的 ${count} 首歌曲吗？原文件不会被删除。`,
+      '批量删除确认',
+      { confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning' }
+    )
+    await Promise.all(
+      selectedSongs.value.map((song) => libraryStore.deleteSong(song.id))
+    )
+    selectedSongs.value = []
+    ElMessage.success(`已删除 ${count} 首歌曲`)
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('删除失败')
+    }
+  }
+}
+
 function handlePageChange() {
   libraryStore.loadSongs()
 }
@@ -198,6 +251,23 @@ function formatDuration(seconds) {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.batch-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background-color: #ecf5ff;
+  border: 1px solid #d9ecff;
+  border-radius: 4px;
+}
+
+.batch-info {
+  font-size: 13px;
+  color: #606266;
+  margin-right: 8px;
 }
 
 .pagination {
