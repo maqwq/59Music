@@ -36,8 +36,8 @@
     </div>
 
     <!-- 批量操作栏 -->
-    <div v-if="selectedSongs.length > 0" class="batch-toolbar">
-      <span class="batch-info">已选择 {{ selectedSongs.length }} 首歌曲</span>
+    <div v-if="selection.selectedCount > 0" class="batch-toolbar">
+      <span class="batch-info">已选择 {{ selection.selectedCount }} 首歌曲</span>
       <el-button type="primary" @click="handleAddSelectedToQueue">
         加入队列
       </el-button>
@@ -53,9 +53,26 @@
       stripe
       style="width: 100%"
       @row-dblclick="handlePlay"
-      @selection-change="handleSelectionChange"
     >
-      <el-table-column type="selection" width="55" />
+      <!-- 自定义选择列 -->
+      <el-table-column width="55">
+        <template #header>
+          <el-checkbox
+            :model-value="selection.isAllSelected"
+            :indeterminate="selection.isIndeterminate"
+            @change="selection.handleSelectAllChange"
+          />
+        </template>
+        <template #default="{ row }">
+          <el-checkbox
+            :model-value="selection.isSelected(row)"
+            @mousedown.prevent="(e) => selection.startDrag(e, row)"
+            @click.prevent="selection.toggle(row)"
+            @mouseenter="selection.onItemEnter(row)"
+          />
+        </template>
+      </el-table-column>
+
       <el-table-column prop="title" label="歌名" min-width="180" />
       <el-table-column prop="artist" label="歌手" min-width="140" />
       <el-table-column prop="album" label="专辑" min-width="160" />
@@ -88,29 +105,25 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useLibraryStore } from '../stores/library'
 import { usePlayerStore } from '../stores/player'
 import { addToQueue } from '../api/queue'
+import { useSelection } from '../composables/useSelection'
 
 const libraryStore = useLibraryStore()
 const playerStore = usePlayerStore()
 
 const scanPath = ref('')
 const searchKeyword = ref('')
-const selectedSongs = ref([])
+
+const selection = useSelection(computed(() => libraryStore.songs), { key: 'id' })
 
 onMounted(() => {
   libraryStore.loadSongs()
   libraryStore.loadStats()
 })
-
-// ===== 选择变化 =====
-
-function handleSelectionChange(selection) {
-  selectedSongs.value = selection
-}
 
 // ===== 事件处理 =====
 
@@ -169,7 +182,7 @@ async function handleDelete(song) {
 }
 
 async function handleAddSelectedToQueue() {
-  const ids = selectedSongs.value.map((song) => song.id)
+  const ids = selection.selectedIds
   if (ids.length === 0) return
   try {
     await addToQueue(ids)
@@ -181,7 +194,7 @@ async function handleAddSelectedToQueue() {
 }
 
 async function handleDeleteSelected() {
-  const count = selectedSongs.value.length
+  const count = selection.selectedCount
   if (count === 0) return
   try {
     await ElMessageBox.confirm(
@@ -190,9 +203,9 @@ async function handleDeleteSelected() {
       { confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning' }
     )
     await Promise.all(
-      selectedSongs.value.map((song) => libraryStore.deleteSong(song.id))
+      selection.selectedItems.map((song) => libraryStore.deleteSong(song.id))
     )
-    selectedSongs.value = []
+    selection.clear()
     ElMessage.success(`已删除 ${count} 首歌曲`)
   } catch (error) {
     if (error !== 'cancel') {
