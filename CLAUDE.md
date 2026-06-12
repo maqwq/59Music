@@ -104,6 +104,17 @@ Database (P0)
         P3 服务层（整合 P1 + P2，暴露 HTTP/WebSocket）
 ```
 
+### 桌面应用套壳
+
+- 前端最终目标形态为**桌面应用**（非浏览器访问），计划在 Vue 3 页面开发完成后通过套壳方案（Electron / Tauri / WebView2 等）打包为独立可执行文件。
+- **当前阶段按常规 Vue 3 页面开发即可**，套壳集成放在项目后期统一处理，无需为套壳写特殊代码。
+- 开发中预留以下套壳友好习惯：
+  - 页面跳转使用 `vue-router`，不直接操作 `window.location`；
+  - 静态资源与 API 路径使用相对路径，避免硬编码开发服务器地址；
+  - Vite 构建的 `base` 当前为默认 `/`，后续套壳时可根据需要切换为 `./`；
+  - 文件/文件夹选择功能先按浏览器能力实现（`<input type="file" webkitdirectory>`），套壳后可替换为原生对话框，但 `scanFolder(path)` 等接口契约保持不变；
+  - 核心状态放在 Pinia 管理，不依赖浏览器专属 API（如 `document.cookie`）。
+
 ### 重要实现细节
 
 - `miniaudio` 以单头文件形式内置，`MINIAUDIO_IMPLEMENTATION` 只在 `backend/src/player/miniaudio_impl.cpp` 中定义一次，其他文件不得重复定义。
