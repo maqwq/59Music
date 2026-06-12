@@ -1,4 +1,4 @@
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, reactive } from 'vue'
 
 /**
  * 多选逻辑 composable
@@ -67,7 +67,14 @@ export function useSelection(items, options = {}) {
     selected.value.delete(getKey(item))
   }
 
+  /** 标记下一次 change 事件是否应被忽略（用于避免拖拽结束后的 click 反转起始项） */
+  let ignoreNextChange = false
+
   function toggle(item) {
+    if (ignoreNextChange) {
+      ignoreNextChange = false
+      return
+    }
     if (isSelected(item)) {
       deselect(item)
     } else {
@@ -104,12 +111,7 @@ export function useSelection(items, options = {}) {
     }
     dragging.value = true
     dragStartSelected.value = isSelected(item)
-
-    if (dragStartSelected.value) {
-      deselect(item)
-    } else {
-      select(item)
-    }
+    ignoreNextChange = false
   }
 
   /**
@@ -118,6 +120,8 @@ export function useSelection(items, options = {}) {
    */
   function onItemEnter(item) {
     if (!dragging.value) return
+
+    ignoreNextChange = true
 
     if (dragStartSelected.value) {
       deselect(item)
@@ -142,7 +146,7 @@ export function useSelection(items, options = {}) {
     document.removeEventListener('mouseup', endDrag)
   })
 
-  return {
+  return reactive({
     selected,
     selectedItems,
     selectedIds,
@@ -160,5 +164,5 @@ export function useSelection(items, options = {}) {
     startDrag,
     onItemEnter,
     endDrag,
-  }
+  })
 }

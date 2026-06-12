@@ -42,7 +42,7 @@
           <el-checkbox
             :model-value="selection.isSelected(row)"
             @mousedown.prevent="(e) => selection.startDrag(e, row)"
-            @click.prevent="selection.toggle(row)"
+            @change="selection.toggle(row)"
             @mouseenter="selection.onItemEnter(row)"
           />
         </template>
