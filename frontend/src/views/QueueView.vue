@@ -11,18 +11,45 @@
       </el-button>
     </div>
 
+    <!-- 批量操作栏 -->
+    <div v-if="selection.selectedCount > 0" class="batch-toolbar">
+      <span class="batch-info">已选择 {{ selection.selectedCount }} 首歌曲</span>
+      <el-button type="danger" @click="handleRemoveSelected">
+        删除
+      </el-button>
+    </div>
+
     <!-- 队列表格 -->
     <el-table
       ref="queueTable"
-      :data="playerStore.queue"
-      row-key="id"
+      :data="queueWithIndex"
+      row-key="index"
       stripe
       style="width: 100%"
       :row-class-name="rowClassName"
       @row-dblclick="handlePlay"
     >
+      <!-- 自定义选择列 -->
+      <el-table-column width="55">
+        <template #header>
+          <el-checkbox
+            :model-value="selection.isAllSelected"
+            :indeterminate="selection.isIndeterminate"
+            @change="selection.handleSelectAllChange"
+          />
+        </template>
+        <template #default="{ row }">
+          <el-checkbox
+            :model-value="selection.isSelected(row)"
+            @mousedown.prevent="(e) => selection.startDrag(e, row)"
+            @click.prevent="selection.toggle(row)"
+            @mouseenter="selection.onItemEnter(row)"
+          />
+        </template>
+      </el-table-column>
+
       <el-table-column label="#" width="60">
-        <template #default="{ $index }">
+        <template #default="{ row, $index }">
           <span v-if="$index === playerStore.currentIndex" class="playing-indicator">
             <el-icon><Video-Play /></el-icon>
           </span>
@@ -43,9 +70,9 @@
       </el-table-column>
 
       <el-table-column label="操作" width="160" fixed="right">
-        <template #default="{ row, $index }">
+        <template #default="{ row }">
           <el-button link type="primary" @click="handlePlay(row)">播放</el-button>
-          <el-button link type="danger" @click="handleRemove($index)">删除</el-button>
+          <el-button link type="danger" @click="handleRemove(row.index)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -56,13 +83,24 @@
 </template>
 
 <script setup>
-import { onMounted } from 'vue'
+import { onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { VideoPlay } from '@element-plus/icons-vue'
 import { usePlayerStore } from '../stores/player'
-import { removeFromQueue, clearQueue, reorderQueue } from '../api/queue'
+import { removeFromQueue, clearQueue } from '../api/queue'
+import { useSelection } from '../composables/useSelection'
 
 const playerStore = usePlayerStore()
+
+/**
+ * 队列表格数据，补充 index 字段
+ * 队列中同一首歌可能出现多次，所以用 index 作为唯一 key
+ */
+const queueWithIndex = computed(() =>
+  playerStore.queue.map((song, index) => ({ ...song, index }))
+)
+
+const selection = useSelection(queueWithIndex, { key: 'index' })
 
 onMounted(() => {
   playerStore.refreshQueue()
@@ -70,7 +108,9 @@ onMounted(() => {
 
 // ===== 事件处理 =====
 
-function handlePlay(song) {
+function handlePlay(row) {
+  const song = { ...row }
+  delete song.index
   playerStore.playSong(song)
   ElMessage.success(`开始播放：${song.title}`)
 }
@@ -82,6 +122,36 @@ async function handleRemove(index) {
     ElMessage.success('已从队列移除')
   } catch {
     ElMessage.error('移除失败')
+  }
+}
+
+async function handleRemoveSelected() {
+  const count = selection.selectedCount
+  if (count === 0) return
+
+  try {
+    await ElMessageBox.confirm(
+      `确定从队列中移除选中的 ${count} 首歌曲吗？`,
+      '批量移除确认',
+      { confirmButtonText: '移除', cancelButtonText: '取消', type: 'warning' }
+    )
+
+    // 按索引从大到小删除，避免删除过程中索引变化导致删错
+    const indices = selection.selectedItems
+      .map((item) => item.index)
+      .sort((a, b) => b - a)
+
+    for (const index of indices) {
+      await removeFromQueue(index)
+    }
+
+    selection.clear()
+    await playerStore.refreshQueue()
+    ElMessage.success(`已移除 ${count} 首歌曲`)
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('移除失败')
+    }
   }
 }
 
@@ -99,6 +169,7 @@ async function handleClear() {
     playerStore.duration = 0
     playerStore.isPlaying = false
     playerStore.currentIndex = -1
+    selection.clear()
     ElMessage.success('队列已清空')
   } catch (error) {
     if (error !== 'cancel') {
@@ -109,7 +180,7 @@ async function handleClear() {
 
 // ===== 表格高亮当前播放行 =====
 
-function rowClassName({ row, rowIndex }) {
+function rowClassName({ rowIndex }) {
   if (rowIndex === playerStore.currentIndex) {
     return 'current-playing-row'
   }
@@ -152,6 +223,23 @@ function formatTime(seconds) {
 .subtitle {
   font-size: 13px;
   color: #909399;
+}
+
+.batch-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background-color: #ecf5ff;
+  border: 1px solid #d9ecff;
+  border-radius: 4px;
+}
+
+.batch-info {
+  font-size: 13px;
+  color: #606266;
+  margin-right: 8px;
 }
 
 .playing-indicator {
