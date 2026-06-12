@@ -51,6 +51,7 @@
       ref="libraryTable"
       v-loading="libraryStore.loading"
       :data="libraryStore.songs"
+      row-key="id"
       stripe
       style="width: 100%"
       @row-dblclick="handlePlay"

@@ -23,7 +23,7 @@
     <el-table
       ref="queueTable"
       :data="queueWithIndex"
-      row-key="index"
+      row-key="id"
       stripe
       style="width: 100%"
       :row-class-name="rowClassName"
