@@ -112,6 +112,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useLibraryStore } from '../stores/library'
 import { usePlayerStore } from '../stores/player'
 import { addToQueue } from '../api/queue'
+import { scanFolder, getSongs, deleteSong, getStats, reorderSongs } from '../api/library'
 import { useSelection } from '../composables/useSelection'
 import { useSortableRows } from '../composables/useSortableRows'
 
@@ -126,12 +127,15 @@ const selection = useSelection(computed(() => libraryStore.songs), { key: 'id' }
 
 useSortableRows(libraryTable, {
   data: computed(() => libraryStore.songs),
-  onSort: (oldIndex, newIndex) => {
-    // 音乐库暂无后端排序接口，仅做前端本地排序展示
-    const songs = [...libraryStore.songs]
-    const [moved] = songs.splice(oldIndex, 1)
-    songs.splice(newIndex, 0, moved)
-    libraryStore.songs = songs
+  onSort: async (oldIndex, newIndex) => {
+    try {
+      await reorderSongs(oldIndex, newIndex)
+      await libraryStore.loadSongs()
+      ElMessage.success('排序已更新')
+    } catch {
+      ElMessage.error('排序失败')
+      await libraryStore.loadSongs()
+    }
   },
 })
 
