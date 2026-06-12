@@ -48,6 +48,7 @@
 
     <!-- 歌曲表格 -->
     <el-table
+      ref="libraryTable"
       v-loading="libraryStore.loading"
       :data="libraryStore.songs"
       stripe
@@ -111,14 +112,27 @@ import { useLibraryStore } from '../stores/library'
 import { usePlayerStore } from '../stores/player'
 import { addToQueue } from '../api/queue'
 import { useSelection } from '../composables/useSelection'
+import { useSortableRows } from '../composables/useSortableRows'
 
 const libraryStore = useLibraryStore()
 const playerStore = usePlayerStore()
 
+const libraryTable = ref(null)
 const scanPath = ref('')
 const searchKeyword = ref('')
 
 const selection = useSelection(computed(() => libraryStore.songs), { key: 'id' })
+
+useSortableRows(libraryTable, {
+  data: computed(() => libraryStore.songs),
+  onSort: (oldIndex, newIndex) => {
+    // 音乐库暂无后端排序接口，仅做前端本地排序展示
+    const songs = [...libraryStore.songs]
+    const [moved] = songs.splice(oldIndex, 1)
+    songs.splice(newIndex, 0, moved)
+    libraryStore.songs = songs
+  },
+})
 
 onMounted(() => {
   libraryStore.loadSongs()
@@ -287,5 +301,14 @@ function formatDuration(seconds) {
   display: flex;
   justify-content: flex-end;
   margin-top: 16px;
+}
+
+:deep(.sortable-ghost) {
+  opacity: 0.5;
+  background-color: #f5f7fa !important;
+}
+
+:deep(.sortable-chosen) {
+  background-color: #ecf5ff !important;
 }
 </style>

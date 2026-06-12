@@ -87,10 +87,13 @@ import { onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { VideoPlay } from '@element-plus/icons-vue'
 import { usePlayerStore } from '../stores/player'
-import { removeFromQueue, clearQueue } from '../api/queue'
+import { removeFromQueue, clearQueue, reorderQueue } from '../api/queue'
 import { useSelection } from '../composables/useSelection'
+import { useSortableRows } from '../composables/useSortableRows'
 
 const playerStore = usePlayerStore()
+
+const queueTable = ref(null)
 
 /**
  * 队列表格数据，补充 index 字段
@@ -101,6 +104,20 @@ const queueWithIndex = computed(() =>
 )
 
 const selection = useSelection(queueWithIndex, { key: 'index' })
+
+useSortableRows(queueTable, {
+  data: computed(() => playerStore.queue),
+  onSort: async (oldIndex, newIndex) => {
+    try {
+      await reorderQueue(oldIndex, newIndex)
+      await playerStore.refreshQueue()
+      ElMessage.success('队列顺序已更新')
+    } catch {
+      ElMessage.error('排序失败')
+      await playerStore.refreshQueue()
+    }
+  },
+})
 
 onMounted(() => {
   playerStore.refreshQueue()
@@ -253,6 +270,15 @@ function formatTime(seconds) {
 }
 
 :deep(.current-playing-row td) {
+  background-color: #ecf5ff !important;
+}
+
+:deep(.sortable-ghost) {
+  opacity: 0.5;
+  background-color: #f5f7fa !important;
+}
+
+:deep(.sortable-chosen) {
   background-color: #ecf5ff !important;
 }
 </style>
