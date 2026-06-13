@@ -108,7 +108,7 @@ static SongInfo songFromRow(sqlite3_stmt* stmt) {
     s.artist    = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3));
     s.album     = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 4));
     s.duration  = sqlite3_column_int(stmt, 5);
-    s.addedTime = static_cast<time_t>(sqlite3_column_int64(stmt, 6));
+    s.addedTime = sqlite3_column_int64(stmt, 6);
     return s;
 }
 

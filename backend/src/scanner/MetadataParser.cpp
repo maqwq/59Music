@@ -18,7 +18,7 @@ std::string MetadataParser::getFileTitle(const std::string& filePath) const {
 SongInfo MetadataParser::parseFile(const std::string& filePath) {
     SongInfo song;
     song.filePath = filePath;
-    song.addedTime = std::time(nullptr);
+    song.addedTime = static_cast<int64_t>(std::time(nullptr));
 
     // 使用TagLib读取元数据
     TagLib::FileRef file(filePath.c_str());

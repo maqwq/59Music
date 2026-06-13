@@ -1,31 +1,28 @@
 # =========================
-
 # OS
-
 # =========================
-
 .DS_Store
 Thumbs.db
 
 # =========================
-
-# IDE
-
+# IDE & Tools
 # =========================
-
 .vscode/
 .idea/
 *.suo
 *.user
 *.opensdf
 *.sdf
+.codebuddy/
 
 # =========================
+# vcpkg (包管理器，不随项目提交)
+# =========================
+vcpkg/
 
+# =========================
 # Build files (C++)
-
 # =========================
-
 build/
 bin/
 obj/
@@ -37,13 +34,11 @@ compile_commands.json
 Makefile
 
 # Executable files
-
 *.exe
 *.out
 *.app
 
-# Object files
-
+# Object & library files
 *.o
 *.obj
 *.so
@@ -52,32 +47,32 @@ Makefile
 *.lib
 
 # =========================
-
-# SQLite
-
+# SQLite (运行时自动创建)
 # =========================
-
+*.db
 *.sqlite
 *.sqlite3
 
 # =========================
-
-# Logs
+# Runtime data
+# =========================
+backend/data/
 
 # =========================
-
+# Logs
+# =========================
 *.log
 
 # =========================
-
 # Vue / Node.js
-
 # =========================
-
 node_modules/
 dist/
 
 # npm / pnpm / yarn
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
 
 npm-debug.log*
 yarn-debug.log*
@@ -85,29 +80,31 @@ yarn-error.log*
 pnpm-debug.log*
 
 # =========================
-
 # Environment files
-
 # =========================
-
 .env
 .env.local
 .env.*.local
 
 # =========================
-
-# Temporary files
-
+# Temporary & test files
 # =========================
-
 tmp/
 temp/
 .cache/
+test_compiler.*
+gcc_error.txt
+$null
 
 # =========================
-
 # Coverage
+# =========================
+coverage/
 
 # =========================
-
-coverage/
+# Test audio files (个人测试用)
+# =========================
+*.mp3
+*.wav
+*.flac
+*.ogg
