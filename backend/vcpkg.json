@@ -4,6 +4,7 @@
   "dependencies": [
     "sqlite3",
     "taglib",
-    "nlohmann-json"
+    "nlohmann-json",
+    "cpp-httplib"
   ]
 }

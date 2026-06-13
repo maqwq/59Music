@@ -34,6 +34,7 @@ public:
 
 private:
     void createTables();
+    bool executeSql(const std::string& sql);
 
     std::string dbPath_;
     sqlite3* db_ = nullptr;

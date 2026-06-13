@@ -9,6 +9,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(SQLite3 REQUIRED)
 find_package(TagLib REQUIRED)
 find_package(nlohmann_json REQUIRED)
+find_package(httplib REQUIRED)
 
 # ============ 头文件搜索路径 ============
 
@@ -77,4 +78,39 @@ add_executable(queue_test
 # 生成测试音频文件的工具
 add_executable(gen_test_wav
     test/gen_test_wav.cpp
+)
+
+# ============ P3: HTTP 服务 ============
+
+add_executable(59music_server
+    src/main.cpp
+    src/database/Database.h
+    src/database/Database.cpp
+    src/scanner/FileScanner.h
+    src/scanner/FileScanner.cpp
+    src/scanner/MetadataParser.h
+    src/scanner/MetadataParser.cpp
+    src/scanner/LibraryManager.h
+    src/scanner/LibraryManager.cpp
+    src/player/PlayerEngine.h
+    src/player/PlayerEngine.cpp
+    src/player/PlayQueue.h
+    src/player/PlayQueue.cpp
+    src/player/AudioDecoder.h
+    src/player/AudioDecoder.cpp
+    src/models/SongInfo.h
+    src/models/PlayerState.h
+    src/models/PlayMode.h
+    ${MINIAUDIO_IMPL}
+    src/server/HttpServer.h
+    src/server/HttpServer.cpp
+    src/server/JsonHelper.h
+)
+
+target_link_libraries(59music_server PRIVATE
+    SQLite::SQLite3
+    TagLib::tag
+    nlohmann_json::nlohmann_json
+    httplib::httplib
+    ${MINIAUDIO_LIBS}
 )
