@@ -129,7 +129,6 @@ void HttpServer::wsBroadcast(const std::string& msg) {
 }
 
 void HttpServer::wsBroadcastPlayerState() {
-    if (wsConnections_.empty()) return;
     Json msg;
     msg["type"] = "player_state";
     msg["data"] = buildPlayerState();
@@ -137,7 +136,6 @@ void HttpServer::wsBroadcastPlayerState() {
 }
 
 void HttpServer::wsBroadcastProgress() {
-    if (wsConnections_.empty()) return;
     Json msg;
     msg["type"] = "progress";
     msg["data"] = {
@@ -148,7 +146,6 @@ void HttpServer::wsBroadcastProgress() {
 }
 
 void HttpServer::wsBroadcastQueueChanged() {
-    if (wsConnections_.empty()) return;
     Json msg;
     msg["type"] = "queue_changed";
     msg["data"] = songsToJsonArray(queue_->getQueue());
@@ -156,7 +153,6 @@ void HttpServer::wsBroadcastQueueChanged() {
 }
 
 void HttpServer::wsBroadcastLibraryUpdated(int addedCount) {
-    if (wsConnections_.empty()) return;
     Json msg;
     msg["type"] = "library_updated";
     msg["data"] = {{"addedCount", addedCount}};
