@@ -7,21 +7,26 @@
 #include <set>
 #include <string>
 #include <vector>
+#include <nlohmann/json.hpp>
 
 // 前向声明
 namespace httplib {
     class Server;
     struct Request;
     struct Response;
-    class DataSink;
+    namespace ws {
+        class WebSocket;
+    }
 }
+
+// PlayerEngine / PlayQueue 在全局命名空间
+class PlayerEngine;
+class PlayQueue;
 
 namespace Music {
 
 class Database;
 class LibraryManager;
-class PlayerEngine;
-class PlayQueue;
 struct SongInfo;
 using Json = nlohmann::json;
 
@@ -44,13 +49,13 @@ private:
     // ── 核心模块 ──
     std::shared_ptr<Database>       db_;
     std::unique_ptr<LibraryManager> library_;
-    std::unique_ptr<PlayerEngine>   engine_;
-    std::unique_ptr<PlayQueue>      queue_;
+    std::unique_ptr<::PlayerEngine> engine_;
+    std::unique_ptr<::PlayQueue>    queue_;
     std::unique_ptr<httplib::Server> svr_;
 
     // ── WebSocket 连接池 ──
     std::mutex wsMutex_;
-    std::set<httplib::DataSink*> wsConnections_;
+    std::set<httplib::ws::WebSocket*> wsConnections_;
 
     // ── 进度推送线程 ──
     std::thread progressThread_;
@@ -66,6 +71,7 @@ private:
     // ── 编排辅助 ──
     void playSongById(int songId);
     void stopCurrentSong();
+    Json buildPlayerState();
 
     // ── WebSocket ──
     void wsBroadcast(const std::string& msg);

@@ -24,6 +24,7 @@ vcpkg/
 # Build files (C++)
 # =========================
 build/
+bld/
 bin/
 obj/
 out/

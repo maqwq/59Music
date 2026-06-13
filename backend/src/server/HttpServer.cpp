@@ -44,7 +44,7 @@ bool HttpServer::init(const std::string& dbPath) {
     registerAllRoutes();
 
     // 全局 CORS 预检
-    svr_->Options(R"(/api/v1/.*)", [this](const httplib::Request&, httplib::Response& res) {
+    svr_->Options("/api/v1/.*", [this](const httplib::Request&, httplib::Response& res) {
         addCorsHeaders(res);
         res.status = 204;
     });
@@ -119,8 +119,7 @@ void HttpServer::wsBroadcast(const std::string& msg) {
     std::lock_guard<std::mutex> lock(wsMutex_);
     auto it = wsConnections_.begin();
     while (it != wsConnections_.end()) {
-        if ((*it)->is_socket_open()) {
-            (*it)->write(msg, httplib::WebSocketOpcode::text);
+        if ((*it)->send(msg)) {
             ++it;
         } else {
             it = wsConnections_.erase(it);
@@ -405,7 +404,7 @@ void HttpServer::registerAllRoutes() {
     }));
 
     // DELETE /queue/{index} — cpp-httplib 用正则捕获: R"(/api/v1/queue/(\d+))"
-    svr_->Delete(R"(/api/v1/queue/(\d+))", wrap([this](const httplib::Request& req, httplib::Response& res) {
+    svr_->Delete("/api/v1/queue/(\\d+)", wrap([this](const httplib::Request& req, httplib::Response& res) {
         std::lock_guard lock(stateMutex_);
         int index = std::stoi(req.matches[1]);
         if (!queue_->removeAt(index)) {
@@ -487,7 +486,7 @@ void HttpServer::registerAllRoutes() {
         }).dump(), "application/json");
     }));
 
-    svr_->Delete(R"(/api/v1/library/songs/(\d+))", wrap([this](const httplib::Request& req, httplib::Response& res) {
+    svr_->Delete("/api/v1/library/songs/(\\d+)", wrap([this](const httplib::Request& req, httplib::Response& res) {
         int id = std::stoi(req.matches[1]);
         if (!library_->deleteSong(id)) {
             res.status = 404;
@@ -508,39 +507,40 @@ void HttpServer::registerAllRoutes() {
 
     // ======================== WebSocket ========================
 
-    svr_->ws("/ws", [this](const httplib::Request&, httplib::DataSink& sink) {
+    svr_->WebSocket("/ws", [this](const httplib::Request&, httplib::ws::WebSocket& ws) {
         // 连接建立
         {
             std::lock_guard<std::mutex> lock(wsMutex_);
-            wsConnections_.insert(&sink);
+            wsConnections_.insert(&ws);
         }
-        std::cout << "[WS] 客户端连接 (总数: " << wsConnections_.size() << ")" << std::endl;
+        std::cout << "[WS] client connected (total: " << wsConnections_.size() << ")" << std::endl;
 
-        // 推送当前状态给新客户端
+        // 推送当前状态
         {
             Json msg;
             msg["type"] = "player_state";
             msg["data"] = buildPlayerState();
-            sink.write(msg.dump(), httplib::WebSocketOpcode::text);
+            ws.send(msg.dump());
         }
         {
             Json msg;
             msg["type"] = "queue_changed";
             msg["data"] = songsToJsonArray(queue_->getQueue());
-            sink.write(msg.dump(), httplib::WebSocketOpcode::text);
+            ws.send(msg.dump());
         }
 
-        // 保持连接直到客户端断开（cpp-httplib 的 ws handler 返回即断开）
-        while (sink.is_socket_open()) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        // 保持连接（阻塞读，客户端断开时 read 返回 false）
+        std::string dummy;
+        while (ws.read(dummy)) {
+            // 忽略客户端消息，仅维持连接
         }
 
         // 断开
         {
             std::lock_guard<std::mutex> lock(wsMutex_);
-            wsConnections_.erase(&sink);
+            wsConnections_.erase(&ws);
         }
-        std::cout << "[WS] 客户端断开 (总数: " << wsConnections_.size() << ")" << std::endl;
+        std::cout << "[WS] client disconnected (total: " << wsConnections_.size() << ")" << std::endl;
     });
 }
 

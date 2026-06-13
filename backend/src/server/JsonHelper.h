@@ -33,20 +33,6 @@ inline void from_json(const Json& j, SongInfo& s) {
     j.at("addedTime").get_to(s.addedTime);
 }
 
-// ============ PlayerState → JSON ============
-
-inline void to_json(Json& j, const PlayerState& s) {
-    j = Json{
-        {"isPlaying", s.isPlaying},
-        {"currentSong", s.currentSong.has_value() ? Json(*s.currentSong) : nullptr},
-        {"currentPosition", s.currentPosition},
-        {"duration", s.duration},
-        {"volume", s.volume},
-        {"muted", s.muted},
-        {"mode", playModeToString(s.mode)}
-    };
-}
-
 // ============ 响应构建辅助 ============
 
 inline Json successResponse(const Json& data = nullptr) {
@@ -78,3 +64,17 @@ inline Json songsToJsonArray(const std::vector<SongInfo>& songs) {
 }
 
 } // namespace Music
+
+// ============ PlayerState → JSON（全局命名空间，ADL 匹配）============
+
+inline void to_json(Music::Json& j, const PlayerState& s) {
+    j = Music::Json{
+        {"isPlaying", s.isPlaying},
+        {"currentSong", s.currentSong.has_value() ? Music::Json(*s.currentSong) : nullptr},
+        {"currentPosition", s.currentPosition},
+        {"duration", s.duration},
+        {"volume", s.volume},
+        {"muted", s.muted},
+        {"mode", playModeToString(s.mode)}
+    };
+}
