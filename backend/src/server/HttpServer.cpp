@@ -338,6 +338,23 @@ void HttpServer::registerAllRoutes() {
         wsBroadcastPlayerState();
     }));
 
+    svr_->Post("/api/v1/player/mute", wrap([this](const httplib::Request& req, httplib::Response& res) {
+        std::lock_guard lock(stateMutex_);
+        auto toggleStr = req.get_param_value("toggle");
+        if (!toggleStr.empty() && toggleStr == "true") {
+            // 切换静音
+            bool muted = engine_->toggleMute();
+            res.set_content(successResponse({{"muted", muted}}).dump(), "application/json");
+        } else {
+            // 设置静音状态
+            auto mutedStr = req.get_param_value("muted");
+            bool mute = (mutedStr == "true" || mutedStr == "1");
+            engine_->setMuted(mute);
+            res.set_content(successResponse(nullptr).dump(), "application/json");
+        }
+        wsBroadcastPlayerState();
+    }));
+
     svr_->Post("/api/v1/player/mode", wrap([this](const httplib::Request& req, httplib::Response& res) {
         std::lock_guard lock(stateMutex_);
         auto modeStr = req.get_param_value("mode");

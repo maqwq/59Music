@@ -96,8 +96,9 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { usePlayerStore } from './stores/player'
+import { useWebSocket } from './composables/useWebSocket'
 import {
   Headset,
   List,
@@ -153,20 +154,22 @@ function cycleMode() {
   playerStore.setMode(modeOrder[nextIndex])
 }
 
-// ===== mock 阶段：模拟播放进度推进 =====
-let progressTimer = null
+// ===== WebSocket 连接（进度推送 + 状态同步）=====
+const { connected } = useWebSocket()
 
-onMounted(() => {
-  playerStore.loadState()
-  progressTimer = setInterval(() => {
-    playerStore.tick()
-  }, 1000)
-})
+onMounted(async () => {
+  // 初始加载状态 + 队列
+  await playerStore.loadState()
+  await playerStore.refreshQueue()
 
-onUnmounted(() => {
-  if (progressTimer) {
-    clearInterval(progressTimer)
-  }
+  // 兜底：如果 WebSocket 连不上，用本地 tick 模拟进度
+  let tickTimer = null
+  const unwatch = watch(connected, (isConnected) => {
+    if (!isConnected && !tickTimer) {
+      console.warn('[App] WebSocket 未连接，启用本地进度模拟')
+      tickTimer = setInterval(() => playerStore.tick(), 1000)
+    }
+  }, { immediate: true })
 })
 </script>
 

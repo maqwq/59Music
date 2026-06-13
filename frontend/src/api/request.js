@@ -40,7 +40,7 @@ request.interceptors.response.use(
  * 设为 true 时使用本地 mock 数据，不发送真实请求；
  * 后端 P3 服务层完成后，改为 false 即可切换到真实 API。
  */
-export const USE_MOCK = true
+export const USE_MOCK = false
 
 /**
  * 辅助函数：模拟网络延迟

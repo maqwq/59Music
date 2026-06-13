@@ -186,15 +186,25 @@ export const usePlayerStore = defineStore('player', () => {
    * 设置静音状态
    * @param {boolean} value
    */
-  function setMuted(value) {
-    muted.value = value
+  async function setMuted(value) {
+    try {
+      await playerApi.setMuted(value)
+      muted.value = value
+    } catch (error) {
+      console.error('设置静音失败:', error)
+    }
   }
 
   /**
    * 切换静音
    */
-  function toggleMuted() {
-    muted.value = !muted.value
+  async function toggleMuted() {
+    try {
+      const result = await playerApi.toggleMute()
+      muted.value = result.muted
+    } catch (error) {
+      console.error('切换静音失败:', error)
+    }
   }
 
   /**

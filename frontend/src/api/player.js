@@ -189,6 +189,34 @@ export function setMode(mode) {
 }
 
 /**
+ * 设置静音状态
+ * @param {boolean} muted 是否静音
+ */
+export function setMuted(muted) {
+  if (USE_MOCK) {
+    return delay().then(() => {
+      mockPlayerState.muted = muted
+      return null
+    })
+  }
+  return request.post('/player/mute', null, { params: { muted } })
+}
+
+/**
+ * 切换静音
+ * @returns {Promise<{ muted: boolean }>}
+ */
+export function toggleMute() {
+  if (USE_MOCK) {
+    return delay().then(() => {
+      mockPlayerState.muted = !mockPlayerState.muted
+      return { muted: mockPlayerState.muted }
+    })
+  }
+  return request.post('/player/mute', null, { params: { toggle: true } })
+}
+
+/**
  * 获取播放器完整状态
  */
 export function getState() {
