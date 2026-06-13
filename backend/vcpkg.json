@@ -1,0 +1,9 @@
+{
+  "name": "59music",
+  "version": "0.1.0",
+  "dependencies": [
+    "sqlite3",
+    "taglib",
+    "nlohmann-json"
+  ]
+}
