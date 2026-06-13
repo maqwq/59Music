@@ -9,6 +9,7 @@
 #include <httplib.h>
 #include <iostream>
 #include <chrono>
+#include <filesystem>
 
 namespace Music {
 
@@ -60,7 +61,7 @@ void HttpServer::run(int port) {
     progressThread_ = std::thread(&HttpServer::progressLoop, this);
 
     std::cout << "[Server] 监听端口: " << port << std::endl;
-    svr_->listen("0.0.0.0", port);
+    svr_->listen("127.0.0.1", port);
 
     // listen 返回后才执行
     running_ = false;
@@ -456,7 +457,20 @@ void HttpServer::registerAllRoutes() {
             res.set_content(errorResponse("缺少 folder 参数").dump(), "application/json");
             return;
         }
-        int added = library_->scanAndImport(folder);
+        // 路径穿越校验
+        if (folder.find("..") != std::string::npos) {
+            res.status = 400;
+            res.set_content(errorResponse("非法路径").dump(), "application/json");
+            return;
+        }
+        std::error_code ec;
+        std::string canonical = std::filesystem::weakly_canonical(folder, ec);
+        if (ec || !std::filesystem::exists(canonical) || !std::filesystem::is_directory(canonical)) {
+            res.status = 400;
+            res.set_content(errorResponse("文件夹不存在或不可访问").dump(), "application/json");
+            return;
+        }
+        int added = library_->scanAndImport(canonical);
         res.set_content(successResponse({{"addedCount", added}}).dump(), "application/json");
         wsBroadcastLibraryUpdated(added);
     }));
@@ -515,14 +529,16 @@ void HttpServer::registerAllRoutes() {
         }
         std::cout << "[WS] client connected (total: " << wsConnections_.size() << ")" << std::endl;
 
-        // 推送当前状态
+        // 推送当前状态（拿锁保护 engine_/queue_ 读取）
         {
+            std::lock_guard<std::mutex> lock(stateMutex_);
             Json msg;
             msg["type"] = "player_state";
             msg["data"] = buildPlayerState();
             ws.send(msg.dump());
         }
         {
+            std::lock_guard<std::mutex> lock(stateMutex_);
             Json msg;
             msg["type"] = "queue_changed";
             msg["data"] = songsToJsonArray(queue_->getQueue());

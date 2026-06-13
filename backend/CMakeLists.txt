@@ -4,9 +4,15 @@ project(59Music LANGUAGES CXX C)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# MSVC UTF-8 支持（源文件含中文字符串）
+# MSVC 安全编译选项 + UTF-8 支持（源文件含中文字符串）
 if(MSVC)
-    add_compile_options(/utf-8)
+    add_compile_options(
+        /utf-8          # 源文件 UTF-8 编码
+        /GS             # 栈缓冲区溢出保护
+        /DYNAMICBASE    # 地址空间随机化 (ASLR)
+        /NXCOMPAT       # 数据执行保护 (DEP)
+        /sdl            # 安全开发生命周期检查
+    )
 endif()
 
 # ============ 第三方库（本地构建，无需 vcpkg）============
