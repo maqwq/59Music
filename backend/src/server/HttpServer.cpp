@@ -10,6 +10,8 @@
 #include <iostream>
 #include <chrono>
 #include <filesystem>
+#include <cstdlib>
+#include <stdexcept>
 
 namespace Music {
 
@@ -20,9 +22,15 @@ namespace Music {
 HttpServer::HttpServer()  = default;
 HttpServer::~HttpServer() = default;
 
+std::string HttpServer::defaultDbPath() {
+    // 数据库放在 exe 同级目录，避免中文路径编码问题
+    return "59music.db";
+}
+
 bool HttpServer::init(const std::string& dbPath) {
+    std::string resolvedPath = dbPath.empty() ? defaultDbPath() : dbPath;
     // ── 数据库 + 音乐库 ──
-    db_ = std::make_shared<Database>(dbPath);
+    db_ = std::make_shared<Database>(resolvedPath);
     if (!db_->open()) {
         std::cerr << "[Server] 数据库打开失败" << std::endl;
         return false;
@@ -93,19 +101,25 @@ void HttpServer::addCorsHeaders(httplib::Response& res) {
 
 void HttpServer::playSongById(int songId) {
     SongInfo song = library_->getSongById(songId);
+    std::clog << "[LOG] playSongById id=" << songId << " found=" << (song.id != 0)
+              << " path=" << song.filePath << std::endl;
     if (song.id == 0) return;
 
     // 查找歌在队列中的位置
     const auto& q = queue_->getQueue();
     for (int i = 0; i < static_cast<int>(q.size()); ++i) {
         if (q[i].id == songId) {
+            std::clog << "[LOG] 在队列中第 " << i << " 位" << std::endl;
             queue_->setCurrentIndex(i);
-            engine_->play(song.filePath);
+            bool ok = engine_->play(song.filePath);
+            std::clog << "[LOG] 播放结果: " << ok << std::endl;
             return;
         }
     }
     // 不在队列中：直接播放，不入队
-    engine_->play(song.filePath);
+    std::clog << "[LOG] 不在队列中，直接播放" << std::endl;
+    bool ok = engine_->play(song.filePath);
+    std::clog << "[LOG] 播放结果: " << ok << std::endl;
 }
 
 void HttpServer::stopCurrentSong() {
@@ -117,14 +131,22 @@ void HttpServer::stopCurrentSong() {
 // ====================================================================
 
 void HttpServer::wsBroadcast(const std::string& msg) {
-    std::lock_guard<std::mutex> lock(wsMutex_);
-    auto it = wsConnections_.begin();
-    while (it != wsConnections_.end()) {
-        if ((*it)->send(msg)) {
-            ++it;
-        } else {
-            it = wsConnections_.erase(it);
+    try {
+        std::lock_guard<std::mutex> lock(wsMutex_);
+        auto it = wsConnections_.begin();
+        while (it != wsConnections_.end()) {
+            try {
+                if ((*it)->send(msg)) {
+                    ++it;
+                } else {
+                    it = wsConnections_.erase(it);
+                }
+            } catch (...) {
+                it = wsConnections_.erase(it);
+            }
         }
+    } catch (...) {
+        // ignore
     }
 }
 
@@ -180,34 +202,51 @@ Json HttpServer::buildPlayerState() {
 // ====================================================================
 
 void HttpServer::progressLoop() {
+    std::clog << "[LOG] progressLoop 启动" << std::endl;
     while (running_) {
         std::this_thread::sleep_for(std::chrono::seconds(1));
 
-        std::lock_guard<std::mutex> lock(stateMutex_);
+        try {
+            std::lock_guard<std::mutex> lock(stateMutex_);
 
-        if (!engine_->isInitialized() || !engine_->hasSong()) {
-            wasPlaying_ = false;
-            continue;
-        }
+            engine_->updatePosition();   // 每秒刷新位置缓存
 
-        bool nowPlaying = engine_->isPlaying();
-
-        // 每秒推送播放进度
-        if (nowPlaying) {
-            wsBroadcastProgress();
-        }
-
-        // 检测歌曲自然结束（不是用户主动暂停）
-        if (wasPlaying_ && !nowPlaying && !pausedByUser_) {
-            auto nextSong = queue_->next();
-            if (nextSong.has_value()) {
-                engine_->play(nextSong->filePath);
-                wsBroadcastPlayerState();
+            if (!engine_->isInitialized() || !engine_->hasSong()) {
+                wasPlaying_ = false;
+                continue;
             }
-        }
 
-        wasPlaying_ = nowPlaying;
+            bool nowPlaying = engine_->isPlaying();
+            std::clog << "[LOG] progress tick: nowPlaying=" << nowPlaying
+                      << " wasPlaying=" << wasPlaying_
+                      << " pausedByUser=" << pausedByUser_ << std::endl;
+
+            if (nowPlaying) {
+                std::clog << "[LOG] 广播进度: pos="
+                          << static_cast<int>(engine_->getCurrentPosition())
+                          << " dur=" << static_cast<int>(engine_->getDuration())
+                          << std::endl;
+                wsBroadcastProgress();
+            }
+
+            if (wasPlaying_ && !nowPlaying && !pausedByUser_) {
+                std::clog << "[LOG] 歌曲结束，尝试切歌" << std::endl;
+                auto nextSong = queue_->next();
+                if (nextSong.has_value()) {
+                    std::clog << "[LOG] 播放下一首: " << nextSong->title << std::endl;
+                    engine_->play(nextSong->filePath);
+                    wsBroadcastPlayerState();
+                } else {
+                    std::clog << "[LOG] 没有下一首" << std::endl;
+                }
+            }
+
+            wasPlaying_ = nowPlaying;
+        } catch (const std::exception& e) {
+            std::cerr << "[LOG] progressLoop 异常: " << e.what() << std::endl;
+        }
     }
+    std::clog << "[LOG] progressLoop 退出" << std::endl;
 }
 
 // ====================================================================
@@ -231,6 +270,7 @@ void HttpServer::registerAllRoutes() {
     // ======================== 播放器 API ========================
 
     svr_->Post("/api/v1/player/play", wrap([this](const httplib::Request& req, httplib::Response& res) {
+        std::clog << "[LOG] POST /player/play" << std::endl;
         std::lock_guard lock(stateMutex_);
         auto songIdStr = req.get_param_value("songId");
         if (songIdStr.empty()) {
@@ -460,7 +500,7 @@ void HttpServer::registerAllRoutes() {
             return;
         }
         std::error_code ec;
-        std::string canonical = std::filesystem::weakly_canonical(folder, ec);
+        std::string canonical = std::filesystem::weakly_canonical(folder, ec).string();
         if (ec || !std::filesystem::exists(canonical) || !std::filesystem::is_directory(canonical)) {
             res.status = 400;
             res.set_content(errorResponse("文件夹不存在或不可访问").dump(), "application/json");

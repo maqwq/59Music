@@ -14,9 +14,14 @@ static void signalHandler(int /*sig*/) {
 }
 
 int main(int argc, char* argv[]) {
-    int port = 8080;
+    int port = 1059;
     if (argc >= 2) {
-        port = std::stoi(argv[1]);
+        try {
+            port = std::stoi(argv[1]);
+        } catch (...) {
+            std::cerr << "端口号格式错误: " << argv[1] << std::endl;
+            return 1;
+        }
     }
 
     // 注册信号处理

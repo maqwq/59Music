@@ -69,7 +69,7 @@ include_directories(
 set(MINIAUDIO_LIBS winmm ole32)
 set(MINIAUDIO_IMPL src/player/miniaudio_impl.cpp)
 
-# ============ P2: 音乐库 CLI ============
+# ============ P2+P3: 音乐库服务器 ============
 
 add_executable(59music
     src/main.cpp
@@ -81,13 +81,28 @@ add_executable(59music
     src/scanner/MetadataParser.cpp
     src/scanner/LibraryManager.h
     src/scanner/LibraryManager.cpp
+    src/player/PlayerEngine.h
+    src/player/PlayerEngine.cpp
+    src/player/PlayQueue.h
+    src/player/PlayQueue.cpp
+    src/player/AudioDecoder.h
+    src/player/AudioDecoder.cpp
     src/models/SongInfo.h
+    src/models/PlayerState.h
+    src/models/PlayMode.h
+    ${MINIAUDIO_IMPL}
+    src/server/HttpServer.h
+    src/server/HttpServer.cpp
+    src/server/JsonHelper.h
 )
 
 target_link_libraries(59music PRIVATE
     sqlite3
     tag
     nlohmann_json
+    httplib
+    ${MINIAUDIO_LIBS}
+    ws2_32
 )
 
 # ============ P1: 播放引擎测试 ============
@@ -150,4 +165,5 @@ target_link_libraries(59music_server PRIVATE
     nlohmann_json
     httplib
     ${MINIAUDIO_LIBS}
+    ws2_32
 )
