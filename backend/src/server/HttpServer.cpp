@@ -133,8 +133,10 @@ bool HttpServer::playSongById(int songId) {
             return ok;
         }
     }
-    // 不在队列中：直接播放，不入队
-    std::clog << "[LOG] 不在队列中，直接播放" << std::endl;
+    // 不在队列中：加入队列末尾，再设为当前
+    std::clog << "[LOG] 不在播放队列中，自动加入队列" << std::endl;
+    queue_->addSongs({song});
+    queue_->setCurrentIndex(queue_->size() - 1);
     bool ok = engine_->play(song.filePath);
     std::clog << "[LOG] 播放结果: " << ok << std::endl;
     return ok;
