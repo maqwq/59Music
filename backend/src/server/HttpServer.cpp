@@ -13,6 +13,17 @@
 #include <cstdlib>
 #include <stdexcept>
 
+#ifdef _WIN32
+#include <windows.h>
+static std::wstring utf8ToWide(const std::string& utf8) {
+    if (utf8.empty()) return L"";
+    int len = MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), -1, nullptr, 0);
+    std::wstring wide(len - 1, L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), -1, &wide[0], len);
+    return wide;
+}
+#endif
+
 namespace Music {
 
 // ====================================================================
@@ -500,12 +511,27 @@ void HttpServer::registerAllRoutes() {
             return;
         }
         std::error_code ec;
+#ifdef _WIN32
+        std::wstring wFolder = utf8ToWide(folder);
+        std::wstring wCanonical = std::filesystem::weakly_canonical(wFolder, ec).wstring();
+        if (ec || !std::filesystem::exists(wCanonical, ec) || !std::filesystem::is_directory(wCanonical, ec)) {
+            res.status = 400;
+            res.set_content(errorResponse("文件夹不存在或不可访问").dump(), "application/json");
+            return;
+        }
+        // 转回 UTF-8 给 LibraryManager 使用
+        int wideLen = static_cast<int>(wCanonical.size());
+        int utf8Len = WideCharToMultiByte(CP_UTF8, 0, wCanonical.c_str(), wideLen, nullptr, 0, nullptr, nullptr);
+        std::string canonical(utf8Len, '\0');
+        WideCharToMultiByte(CP_UTF8, 0, wCanonical.c_str(), wideLen, &canonical[0], utf8Len, nullptr, nullptr);
+#else
         std::string canonical = std::filesystem::weakly_canonical(folder, ec).string();
         if (ec || !std::filesystem::exists(canonical) || !std::filesystem::is_directory(canonical)) {
             res.status = 400;
             res.set_content(errorResponse("文件夹不存在或不可访问").dump(), "application/json");
             return;
         }
+#endif
         int added = library_->scanAndImport(canonical);
         res.set_content(successResponse({{"addedCount", added}}).dump(), "application/json");
         wsBroadcastLibraryUpdated(added);
