@@ -61,6 +61,12 @@ bool HttpServer::init(const std::string& dbPath) {
     // ── HTTP 服务器 ──
     svr_ = std::make_unique<httplib::Server>();
 
+    // 请求日志
+    svr_->set_logger([](const httplib::Request& req, const httplib::Response& res) {
+        std::cout << "[HTTP] " << req.method << " " << req.path
+                  << " -> " << res.status << std::endl;
+    });
+
     registerAllRoutes();
 
     // 全局 CORS 预检
