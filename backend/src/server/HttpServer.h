@@ -72,7 +72,7 @@ private:
     void addCorsHeaders(httplib::Response& res);
 
     // ── 编排辅助 ──
-    void playSongById(int songId);
+    bool playSongById(int songId);
     void stopCurrentSong();
     Json buildPlayerState();
 

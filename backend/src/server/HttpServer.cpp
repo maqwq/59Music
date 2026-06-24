@@ -116,11 +116,11 @@ void HttpServer::addCorsHeaders(httplib::Response& res) {
 // 编排辅助
 // ====================================================================
 
-void HttpServer::playSongById(int songId) {
+bool HttpServer::playSongById(int songId) {
     SongInfo song = library_->getSongById(songId);
     std::clog << "[LOG] playSongById id=" << songId << " found=" << (song.id != 0)
               << " path=" << song.filePath << std::endl;
-    if (song.id == 0) return;
+    if (song.id == 0) return false;
 
     // 查找歌在队列中的位置
     const auto& q = queue_->getQueue();
@@ -130,13 +130,14 @@ void HttpServer::playSongById(int songId) {
             queue_->setCurrentIndex(i);
             bool ok = engine_->play(song.filePath);
             std::clog << "[LOG] 播放结果: " << ok << std::endl;
-            return;
+            return ok;
         }
     }
     // 不在队列中：直接播放，不入队
     std::clog << "[LOG] 不在队列中，直接播放" << std::endl;
     bool ok = engine_->play(song.filePath);
     std::clog << "[LOG] 播放结果: " << ok << std::endl;
+    return ok;
 }
 
 void HttpServer::stopCurrentSong() {
@@ -302,7 +303,11 @@ void HttpServer::registerAllRoutes() {
             res.set_content(errorResponse("歌曲不存在").dump(), "application/json");
             return;
         }
-        playSongById(songId);
+        if (!playSongById(songId)) {
+            res.status = 400;
+            res.set_content(errorResponse("播放失败，无法打开音频文件").dump(), "application/json");
+            return;
+        }
         pausedByUser_ = false;
         wasPlaying_ = true;
         res.set_content(successResponse(nullptr).dump(), "application/json");

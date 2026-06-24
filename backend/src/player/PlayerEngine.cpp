@@ -5,6 +5,18 @@
 #include "PlayerEngine.h"
 #include <cstring>
 #include <stdexcept>
+#include <iostream>
+
+#ifdef _WIN32
+#include <windows.h>
+static std::wstring utf8ToWide(const std::string& utf8) {
+    if (utf8.empty()) return L"";
+    int len = MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), -1, nullptr, 0);
+    std::wstring wide(len - 1, L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), -1, &wide[0], len);
+    return wide;
+}
+#endif
 
 // ─── 歌曲结束回调（在 miniaudio 音频线程调用） ──────────
 static void onSoundEnd(void* pUserData, ma_sound*) {
@@ -66,10 +78,19 @@ struct PlayerEngine::Impl {
         cleanupSound();
 
         sound = new ma_sound();
+#ifdef _WIN32
+        std::wstring wPath = utf8ToWide(filePath);
+        ma_result result = ma_sound_init_from_file_w(
+            engine, wPath.c_str(), 0, nullptr, nullptr, sound
+        );
+#else
         ma_result result = ma_sound_init_from_file(
             engine, filePath.c_str(), 0, nullptr, nullptr, sound
         );
+#endif
         if (result != MA_SUCCESS) {
+            std::cerr << "[PlayerEngine] 加载失败: " << filePath
+                      << " (ma_result=" << result << ")" << std::endl;
             delete sound;
             sound = nullptr;
             return false;
