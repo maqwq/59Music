@@ -2,6 +2,10 @@
 #include <csignal>
 #include "server/HttpServer.h"
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 using namespace Music;
 
 static HttpServer* g_server = nullptr;
@@ -14,6 +18,10 @@ static void signalHandler(int /*sig*/) {
 }
 
 int main(int argc, char* argv[]) {
+#ifdef _WIN32
+    SetConsoleOutputCP(CP_UTF8);
+#endif
+
     int port = 1059;
     if (argc >= 2) {
         try {
