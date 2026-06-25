@@ -5,29 +5,44 @@
 #include "PlayerEngine.h"
 #include <cstring>
 #include <stdexcept>
+#include <iostream>
 
-// ─── 歌曲播放完毕回调（在 miniaudio 音频线程中调用） ─────
-//
-// 歌曲自然播完时 miniaudio 会回调此函数。
-// 我们的任务：将 playing 标志设为 false，
-// 外部通过轮询 isPlaying() 即可感知播完事件，触发自动切歌。
-//
-void PlayerEngine::onSoundEnd(void* pUserData, ma_sound* /*pSound*/) {
-    auto* playing = static_cast<bool*>(pUserData);
-    *playing = false;
+#ifdef _WIN32
+#include <windows.h>
+static std::wstring utf8ToWide(const std::string& utf8) {
+    if (utf8.empty()) return L"";
+    int len = MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), -1, nullptr, 0);
+    std::wstring wide(len - 1, L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), -1, &wide[0], len);
+    return wide;
+}
+#endif
+
+// ─── 歌曲结束回调（在 miniaudio 音频线程调用） ──────────
+static void onSoundEnd(void* pUserData, ma_sound*) {
+    // 仅设置标志，不做其他操作（音频线程中调用）
+    *static_cast<bool*>(pUserData) = false;
 }
 
 // ─── PImpl 内部实现结构 ───────────────────────────────────────
+//
+// 手动维护 playing_ 标志，避免直接调用 ma_sound_* 函数
+// 导致的崩溃问题。playing_ 只由 play/stop/toggle 和
+// ma_sound_set_end_callback 在音频线程中修改。
+//
 struct PlayerEngine::Impl {
     ma_engine* engine = nullptr;
     ma_sound*  sound  = nullptr;
 
     bool initialized = false;
-    bool playing     = false;
+    bool playing     = false;   // 手动维护的播放状态
 
-    int  volume       = 80;  // 0-100
-    int  savedVolume  = 80;  // 静音前的音量
+    int  volume       = 80;
+    int  savedVolume  = 80;
     bool muted        = false;
+
+    double durationSec = 0.0;   // 缓存时长，避免跨线程查询 miniaudio
+    double positionSec = 0.0;   // 缓存位置（每次 play/seek/toggle 时更新）
 
     std::string currentFilePath;
 
@@ -38,7 +53,6 @@ struct PlayerEngine::Impl {
 
     bool initEngine() {
         if (engine) return true;
-
         engine = new ma_engine();
         ma_result result = ma_engine_init(nullptr, engine);
         if (result != MA_SUCCESS) {
@@ -46,7 +60,6 @@ struct PlayerEngine::Impl {
             engine = nullptr;
             return false;
         }
-
         initialized = true;
         ma_engine_start(engine);
         return true;
@@ -65,24 +78,37 @@ struct PlayerEngine::Impl {
         cleanupSound();
 
         sound = new ma_sound();
-        // flags = 0 表示不会自动播放，由外部调用 ma_sound_start
+#ifdef _WIN32
+        std::wstring wPath = utf8ToWide(filePath);
+        ma_result result = ma_sound_init_from_file_w(
+            engine, wPath.c_str(), 0, nullptr, nullptr, sound
+        );
+#else
         ma_result result = ma_sound_init_from_file(
             engine, filePath.c_str(), 0, nullptr, nullptr, sound
         );
-
+#endif
         if (result != MA_SUCCESS) {
+            std::cerr << "[PlayerEngine] 加载失败: " << filePath
+                      << " (ma_result=" << result << ")" << std::endl;
             delete sound;
             sound = nullptr;
             return false;
         }
 
         currentFilePath = filePath;
-
-        // 注册歌曲播完回调，pUserData 指向 playing 标志
-        ma_sound_set_end_callback(sound, onSoundEnd, &playing);
-
-        // 应用当前音量（如果是静音状态则设为 0）
         ma_sound_set_volume(sound, muted ? 0.0f : volume / 100.0f);
+
+        // 缓存时长（避免 progressLoop 跨线程查询崩溃）
+        ma_uint64 frames;
+        if (ma_sound_get_length_in_pcm_frames(sound, &frames) == MA_SUCCESS) {
+            durationSec = static_cast<double>(frames) / ma_engine_get_sample_rate(engine);
+        } else {
+            durationSec = 0.0;
+        }
+
+        // 注册结束回调（miniaudio 音频线程中设置手动标志）
+        ma_sound_set_end_callback(sound, onSoundEnd, &playing);
 
         return true;
     }
@@ -152,6 +178,7 @@ bool PlayerEngine::play(const std::string& filePath) {
     }
 
     impl_->playing = true;
+    impl_->positionSec = 0.0;
     return true;
 }
 
@@ -175,14 +202,24 @@ void PlayerEngine::stop() {
 bool PlayerEngine::seek(double seconds) {
     if (!impl_->sound) return false;
 
-    // 使用引擎采样率进行帧计算。
-    // miniaudio 引擎会自动重采样所有音频到引擎采样率，
-    // 所以用引擎采样率计算帧位置是准确的。
     ma_uint64 frame = static_cast<ma_uint64>(
         seconds * ma_engine_get_sample_rate(impl_->engine)
     );
     ma_result result = ma_sound_seek_to_pcm_frame(impl_->sound, frame);
-    return result == MA_SUCCESS;
+    if (result == MA_SUCCESS) {
+        impl_->positionSec = seconds;
+        return true;
+    }
+    return false;
+}
+
+void PlayerEngine::updatePosition() {
+    if (impl_->sound && impl_->playing) {
+        ma_uint64 cursor;
+        if (ma_sound_get_cursor_in_pcm_frames(impl_->sound, &cursor) == MA_SUCCESS) {
+            impl_->positionSec = static_cast<double>(cursor) / ma_engine_get_sample_rate(impl_->engine);
+        }
+    }
 }
 
 void PlayerEngine::setVolume(int volume) {
@@ -196,7 +233,6 @@ void PlayerEngine::setVolume(int volume) {
 void PlayerEngine::setMuted(bool muted) {
     if (impl_->muted == muted) return;
     impl_->muted = muted;
-
     if (impl_->sound) {
         if (muted) {
             impl_->savedVolume = impl_->volume;
@@ -213,27 +249,18 @@ bool PlayerEngine::toggleMute() {
 }
 
 bool PlayerEngine::isPlaying() const {
+    // 使用手动标志，不调 miniaudio 函数，避免跨线程访问
     return impl_->playing;
 }
 
 double PlayerEngine::getCurrentPosition() const {
-    if (!impl_->sound) return 0.0;
-
-    ma_uint64 cursor;
-    ma_result result = ma_sound_get_cursor_in_pcm_frames(impl_->sound, &cursor);
-    if (result != MA_SUCCESS) return 0.0;
-
-    return static_cast<double>(cursor) / ma_engine_get_sample_rate(impl_->engine);
+    // 从缓存读取，不调 miniaudio 函数（跨线程安全）
+    return impl_->positionSec;
 }
 
 double PlayerEngine::getDuration() const {
-    if (!impl_->sound) return 0.0;
-
-    ma_uint64 length;
-    ma_result result = ma_sound_get_length_in_pcm_frames(impl_->sound, &length);
-    if (result != MA_SUCCESS) return 0.0;
-
-    return static_cast<double>(length) / ma_engine_get_sample_rate(impl_->engine);
+    // 从缓存读取，不调 miniaudio 函数（跨线程安全）
+    return impl_->durationSec;
 }
 
 int PlayerEngine::getVolume() const {

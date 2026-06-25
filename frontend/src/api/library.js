@@ -66,7 +66,8 @@ export function scanFolder(folder) {
       return { addedCount: 5 }
     })
   }
-  return request.post('/library/scan', null, { params: { folder } })
+  // 扫描可能耗时较长，不限超时
+  return request.post('/library/scan', null, { params: { folder }, timeout: 0 })
 }
 
 /**

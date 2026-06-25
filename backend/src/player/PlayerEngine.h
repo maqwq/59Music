@@ -4,7 +4,7 @@
 #include <string>
 #include <cstdint>
 
-struct ma_sound;  // miniaudio 声音对象，用于回调参数类型
+
 
 /**
  * PlayerEngine — 音频播放引擎
@@ -94,6 +94,9 @@ public:
      */
     bool toggleMute();
 
+    /** 更新位置缓存（由 progressLoop 线程每秒调用一次） */
+    void updatePosition();
+
     // ─── 状态查询 ─────────────────────────────────────────
 
     /** 是否正在播放（歌曲自然播完时自动变为 false） */
@@ -115,9 +118,6 @@ public:
     bool hasSong() const;
 
 private:
-    // 歌曲播放完毕时由 miniaudio 音频线程回调的静态函数
-    static void onSoundEnd(void* pUserData, ma_sound* pSound);
-
     struct Impl;
     Impl* impl_;
 };

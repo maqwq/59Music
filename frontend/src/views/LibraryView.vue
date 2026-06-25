@@ -13,7 +13,7 @@
       <div class="toolbar-left">
         <el-input
           v-model="scanPath"
-          placeholder="输入要扫描的文件夹路径（mock 阶段）"
+          placeholder="输入要扫描的文件夹路径"
           clearable
           style="width: 320px"
           @keyup.enter="handleScan"

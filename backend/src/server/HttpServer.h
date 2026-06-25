@@ -41,8 +41,11 @@ public:
     HttpServer(HttpServer&&) = delete;
     HttpServer& operator=(HttpServer&&) = delete;
 
-    bool init(const std::string& dbPath = "data/59music.db");
-    void run(int port = 8080);
+    /** 获取默认数据库路径：%LOCALAPPDATA%/59Music/59music.db */
+    static std::string defaultDbPath();
+
+    bool init(const std::string& dbPath = "");
+    void run(int port = 1059);
     void stop();
 
 private:
@@ -69,7 +72,7 @@ private:
     void addCorsHeaders(httplib::Response& res);
 
     // ── 编排辅助 ──
-    void playSongById(int songId);
+    bool playSongById(int songId);
     void stopCurrentSong();
     Json buildPlayerState();
 
