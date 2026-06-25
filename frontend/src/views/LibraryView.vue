@@ -1,11 +1,43 @@
 <template>
   <div class="library-view">
-    <!-- 统计信息 -->
+    <!-- 统计卡片 -->
     <div class="stats-row">
-      <el-statistic title="总歌曲" :value="libraryStore.stats.totalSongs" />
-      <el-statistic title="总时长" :value="formatDuration(libraryStore.stats.totalDuration)" />
-      <el-statistic title="歌手" :value="libraryStore.stats.totalArtists" />
-      <el-statistic title="专辑" :value="libraryStore.stats.totalAlbums" />
+      <div class="stat-card">
+        <div class="stat-icon" style="background: linear-gradient(135deg, #667eea, #764ba2)">
+          <el-icon size="20"><Headset /></el-icon>
+        </div>
+        <div class="stat-info">
+          <div class="stat-value">{{ libraryStore.stats.totalSongs }}</div>
+          <div class="stat-label">总歌曲</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background: linear-gradient(135deg, #f093fb, #f5576c)">
+          <el-icon size="20"><Timer /></el-icon>
+        </div>
+        <div class="stat-info">
+          <div class="stat-value">{{ formatDuration(libraryStore.stats.totalDuration) }}</div>
+          <div class="stat-label">总时长</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background: linear-gradient(135deg, #4facfe, #00f2fe)">
+          <el-icon size="20"><User /></el-icon>
+        </div>
+        <div class="stat-info">
+          <div class="stat-value">{{ libraryStore.stats.totalArtists }}</div>
+          <div class="stat-label">歌手</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background: linear-gradient(135deg, #43e97b, #38f9d7)">
+          <el-icon size="20"><Folder /></el-icon>
+        </div>
+        <div class="stat-info">
+          <div class="stat-value">{{ libraryStore.stats.totalAlbums }}</div>
+          <div class="stat-label">专辑</div>
+        </div>
+      </div>
     </div>
 
     <!-- 操作栏 -->
@@ -13,12 +45,17 @@
       <div class="toolbar-left">
         <el-input
           v-model="scanPath"
-          placeholder="输入要扫描的文件夹路径"
+          placeholder="输入文件夹路径，按回车扫描"
           clearable
-          style="width: 320px"
+          class="scan-input"
           @keyup.enter="handleScan"
-        />
+        >
+          <template #prefix>
+            <el-icon><FolderOpened /></el-icon>
+          </template>
+        </el-input>
         <el-button type="primary" :loading="libraryStore.scanning" @click="handleScan">
+          <el-icon><Search /></el-icon>
           扫描文件夹
         </el-button>
       </div>
@@ -27,9 +64,13 @@
           v-model="searchKeyword"
           placeholder="搜索歌名 / 歌手 / 专辑"
           clearable
-          style="width: 240px"
+          class="search-input"
           @keyup.enter="handleSearch"
-        />
+        >
+          <template #prefix>
+            <el-icon><Search /></el-icon>
+          </template>
+        </el-input>
         <el-button @click="handleSearch">搜索</el-button>
         <el-button @click="handleReset">重置</el-button>
       </div>
@@ -37,60 +78,110 @@
 
     <!-- 批量操作栏 -->
     <div v-if="selection.selectedCount > 0" class="batch-toolbar">
-      <span class="batch-info">已选择 {{ selection.selectedCount }} 首歌曲</span>
-      <el-button type="primary" @click="handleAddSelectedToQueue">
-        加入队列
-      </el-button>
-      <el-button type="danger" @click="handleDeleteSelected">
-        删除
-      </el-button>
+      <span class="batch-info">
+        <el-icon><Check /></el-icon>
+        已选择 {{ selection.selectedCount }} 首歌曲
+      </span>
+      <div class="batch-actions">
+        <el-button size="small" type="primary" @click="handleAddSelectedToQueue">
+          加入队列
+        </el-button>
+        <el-button size="small" type="success" @click="showCreatePlaylistDialog = true">
+          创建歌单
+        </el-button>
+        <el-button size="small" @click="showAddToPlaylistDialog = true">
+          添加到歌单
+        </el-button>
+        <el-button size="small" type="danger" plain @click="handleDeleteSelected">
+          删除
+        </el-button>
+      </div>
     </div>
 
     <!-- 歌曲表格 -->
-    <el-table
-      ref="libraryTable"
-      v-loading="libraryStore.loading"
-      :data="libraryStore.songs"
-      row-key="id"
-      stripe
-      style="width: 100%"
-      @row-dblclick="handlePlay"
-    >
-      <!-- 自定义选择列 -->
-      <el-table-column width="55">
-        <template #header>
-          <el-checkbox
-            :model-value="selection.isAllSelected"
-            :indeterminate="selection.isIndeterminate"
-            @change="selection.handleSelectAllChange"
-          />
-        </template>
-        <template #default="{ row }">
-          <el-checkbox
-            :model-value="selection.isSelected(row)"
-            @mousedown.prevent="(e) => selection.startDrag(e, row)"
-            @change="selection.toggle(row)"
-            @mouseenter="selection.onItemEnter(row)"
-          />
-        </template>
-      </el-table-column>
+    <div class="table-wrapper">
+      <el-table
+        ref="libraryTable"
+        v-loading="libraryStore.loading"
+        :data="libraryStore.songs"
+        row-key="id"
+        class="song-table"
+        @row-dblclick="handlePlay"
+      >
+        <!-- 自定义选择列 -->
+        <el-table-column width="50">
+          <template #header>
+            <el-checkbox
+              :model-value="selection.isAllSelected"
+              :indeterminate="selection.isIndeterminate"
+              @change="selection.handleSelectAllChange"
+            />
+          </template>
+          <template #default="{ row }">
+            <el-checkbox
+              :model-value="selection.isSelected(row)"
+              @mousedown.prevent="(e) => selection.startDrag(e, row)"
+              @change="selection.toggle(row)"
+              @mouseenter="selection.onItemEnter(row)"
+            />
+          </template>
+        </el-table-column>
 
-      <el-table-column prop="title" label="歌名" min-width="180" />
-      <el-table-column prop="artist" label="歌手" min-width="140" />
-      <el-table-column prop="album" label="专辑" min-width="160" />
-      <el-table-column label="时长" width="100">
-        <template #default="{ row }">
-          {{ formatTime(row.duration) }}
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" width="200" fixed="right">
-        <template #default="{ row }">
-          <el-button link type="primary" @click="handlePlay(row)">播放</el-button>
-          <el-button link type="primary" @click="handleAddToQueue(row)">加入队列</el-button>
-          <el-button link type="danger" @click="handleDelete(row)">删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+        <el-table-column label="歌名" min-width="200" show-overflow-tooltip>
+          <template #default="{ row }">
+            <span v-if="editingCell !== `title-${row.id}`" class="editable-cell" @click="startEdit(row, 'title')">
+              {{ row.title }}
+            </span>
+            <el-input
+              v-else
+              :ref="(el) => setEditRef(`title-${row.id}`, el)"
+              v-model="editValue"
+              size="small"
+              @blur="saveEdit(row)"
+              @keyup.enter="saveEdit(row)"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column label="歌手" min-width="140" show-overflow-tooltip>
+          <template #default="{ row }">
+            <span v-if="editingCell !== `artist-${row.id}`" class="editable-cell" @click="startEdit(row, 'artist')">
+              {{ row.artist }}
+            </span>
+            <el-input
+              v-else
+              :ref="(el) => setEditRef(`artist-${row.id}`, el)"
+              v-model="editValue"
+              size="small"
+              @blur="saveEdit(row)"
+              @keyup.enter="saveEdit(row)"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column label="专辑" min-width="140" show-overflow-tooltip>
+          <template #default="{ row }">
+            <span class="album-cell">{{ row.album }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="时长" width="90" align="center">
+          <template #default="{ row }">
+            <span class="duration-cell">{{ formatTime(row.duration) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="200" fixed="right">
+          <template #default="{ row }">
+            <el-button link type="primary" size="small" @click="handlePlay(row)">
+              <el-icon><VideoPlay /></el-icon> 播放
+            </el-button>
+            <el-button link type="primary" size="small" @click="handleAddToQueue(row)">
+              加入队列
+            </el-button>
+            <el-button link type="danger" size="small" @click="handleDelete(row)">
+              删除
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </div>
 
     <!-- 分页 -->
     <div class="pagination">
@@ -100,24 +191,63 @@
         :total="libraryStore.total"
         :page-sizes="[20, 50, 100]"
         layout="total, sizes, prev, pager, next"
+        background
         @change="handlePageChange"
       />
     </div>
+
+    <!-- 创建歌单弹框 -->
+    <el-dialog v-model="showCreatePlaylistDialog" title="创建歌单" width="420px" :close-on-click-modal="false">
+      <el-input v-model="newPlaylistName" placeholder="输入歌单名称" size="large" />
+      <template #footer>
+        <el-button @click="showCreatePlaylistDialog = false">取消</el-button>
+        <el-button type="primary" @click="handleCreatePlaylist">创建</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 添加到已有歌单弹框 -->
+    <el-dialog v-model="showAddToPlaylistDialog" title="添加到歌单" width="420px" :close-on-click-modal="false">
+      <el-select v-model="targetPlaylistId" placeholder="选择歌单" style="width: 100%" size="large">
+        <el-option
+          v-for="pl in playlistStore.playlists"
+          :key="pl.id"
+          :label="`${pl.name} (${pl.songCount}首)`"
+          :value="pl.id"
+        />
+      </el-select>
+      <template #footer>
+        <el-button @click="showAddToPlaylistDialog = false">取消</el-button>
+        <el-button type="primary" @click="handleAddToPlaylist" :disabled="!targetPlaylistId">添加</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useLibraryStore } from '../stores/library'
 import { usePlayerStore } from '../stores/player'
+import { usePlaylistStore } from '../stores/playlist'
 import { addToQueue } from '../api/queue'
-import { scanFolder, getSongs, deleteSong, getStats, reorderSongs } from '../api/library'
+import { scanFolder, getSongs, deleteSong, getStats, reorderSongs, updateSongMeta } from '../api/library'
 import { useSelection } from '../composables/useSelection'
 import { useSortableRows } from '../composables/useSortableRows'
+import { formatTime, formatDuration } from '../utils/format'
+import {
+  Headset,
+  Timer,
+  User,
+  Folder,
+  FolderOpened,
+  Search,
+  Check,
+  VideoPlay,
+} from '@element-plus/icons-vue'
 
 const libraryStore = useLibraryStore()
 const playerStore = usePlayerStore()
+const playlistStore = usePlaylistStore()
 
 const libraryTable = ref(null)
 const scanPath = ref('')
@@ -142,7 +272,86 @@ useSortableRows(libraryTable, {
 onMounted(() => {
   libraryStore.loadSongs()
   libraryStore.loadStats()
+  playlistStore.loadPlaylists()
 })
+
+// ===== 内联编辑 =====
+
+const editingCell = ref(null)   // "title-{id}" | "artist-{id}" | null
+const editValue = ref('')
+const editRefs = {}
+
+function setEditRef(key, el) {
+  if (el) editRefs[key] = el
+}
+
+function startEdit(row, field) {
+  editingCell.value = `${field}-${row.id}`
+  editValue.value = row[field]
+  nextTick(() => {
+    const input = editRefs[`${field}-${row.id}`]
+    if (input && typeof input.focus === 'function') input.focus()
+  })
+}
+
+async function saveEdit(row) {
+  const key = editingCell.value
+  if (!key) return
+  const field = key.startsWith('title-') ? 'title' : 'artist'
+  const newValue = editValue.value.trim()
+  editingCell.value = null
+
+  if (newValue && newValue !== row[field]) {
+    try {
+      await updateSongMeta(row.id, field === 'title' ? newValue : row.title, field === 'artist' ? newValue : row.artist)
+      row.title = field === 'title' ? newValue : row.title
+      row.artist = field === 'artist' ? newValue : row.artist
+      ElMessage.success('已更新')
+    } catch {
+      ElMessage.error('更新失败')
+    }
+  }
+}
+
+// ===== 歌单弹框 =====
+
+const showCreatePlaylistDialog = ref(false)
+const showAddToPlaylistDialog = ref(false)
+const newPlaylistName = ref('')
+const targetPlaylistId = ref(null)
+
+async function handleCreatePlaylist() {
+  const name = newPlaylistName.value.trim()
+  if (!name) return
+  const ids = selection.selectedIds
+  if (ids.length === 0) {
+    ElMessage.warning('请先选择歌曲')
+    return
+  }
+  try {
+    await playlistStore.create(name, ids)
+    showCreatePlaylistDialog.value = false
+    newPlaylistName.value = ''
+    selection.clear()
+    ElMessage.success(`歌单 "${name}" 已创建`)
+  } catch {
+    ElMessage.error('创建失败')
+  }
+}
+
+async function handleAddToPlaylist() {
+  if (!targetPlaylistId.value) return
+  const ids = selection.selectedIds
+  try {
+    await playlistStore.addSongs(targetPlaylistId.value, ids)
+    showAddToPlaylistDialog.value = false
+    targetPlaylistId.value = null
+    selection.clear()
+    ElMessage.success(`已将 ${ids.length} 首歌加入歌单`)
+  } catch {
+    ElMessage.error('添加失败')
+  }
+}
 
 // ===== 事件处理 =====
 
@@ -236,80 +445,172 @@ async function handleDeleteSelected() {
 function handlePageChange() {
   libraryStore.loadSongs()
 }
-
-// ===== 格式化 =====
-
-function formatTime(seconds) {
-  if (!seconds || seconds < 0) return '00:00'
-  const m = Math.floor(seconds / 60)
-  const s = Math.floor(seconds % 60)
-  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
-}
-
-function formatDuration(seconds) {
-  if (!seconds || seconds < 0) return '00:00'
-  const h = Math.floor(seconds / 3600)
-  const m = Math.floor((seconds % 3600) / 60)
-  if (h > 0) {
-    return `${h}小时${m}分钟`
-  }
-  return `${m}分钟`
-}
 </script>
 
 <style scoped>
 .library-view {
-  padding: 20px;
+  padding: 24px;
+  max-width: 1400px;
 }
 
+/* ===== 统计卡片 ===== */
 .stats-row {
-  display: flex;
-  gap: 40px;
-  margin-bottom: 20px;
-  padding: 16px 20px;
-  background-color: #f5f7fa;
-  border-radius: 8px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
 }
 
+.stat-card {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 20px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.stat-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  flex-shrink: 0;
+}
+
+.stat-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: #303133;
+  line-height: 1.2;
+}
+
+.stat-label {
+  font-size: 13px;
+  color: #909399;
+  margin-top: 2px;
+}
+
+/* ===== 操作栏 ===== */
 .toolbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 16px;
+  gap: 16px;
 }
 
 .toolbar-left,
 .toolbar-right {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
+.scan-input {
+  width: 300px;
+}
+
+.search-input {
+  width: 240px;
+}
+
+/* ===== 批量操作栏 ===== */
 .batch-toolbar {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 12px;
   margin-bottom: 12px;
-  padding: 8px 12px;
-  background-color: #ecf5ff;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, #ecf5ff, #e8f4fd);
   border: 1px solid #d9ecff;
-  border-radius: 4px;
+  border-radius: 8px;
 }
 
 .batch-info {
   font-size: 13px;
-  color: #606266;
-  margin-right: 8px;
+  color: #409eff;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
+.batch-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ===== 表格 ===== */
+.table-wrapper {
+  background: #ffffff;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.song-table {
+  width: 100%;
+}
+
+.song-table :deep(.el-table__header th) {
+  background: #fafbfc;
+  color: #606266;
+  font-weight: 600;
+  font-size: 13px;
+  border-bottom: 2px solid #ebeef5;
+}
+
+.song-table :deep(.el-table__body tr) {
+  transition: background-color 0.15s;
+}
+
+.album-cell {
+  color: #909399;
+  font-size: 13px;
+}
+
+.duration-cell {
+  color: #909399;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ===== 分页 ===== */
 .pagination {
   display: flex;
   justify-content: flex-end;
   margin-top: 16px;
 }
 
+/* ===== 内联编辑 ===== */
+.editable-cell {
+  cursor: pointer;
+  display: inline-block;
+  width: 100%;
+  padding: 3px 6px;
+  border-radius: 4px;
+  transition: background-color 0.15s;
+}
+
+.editable-cell:hover {
+  background-color: #ecf5ff;
+  color: #409eff;
+}
+
+/* ===== 拖拽排序 ===== */
 :deep(.sortable-ghost) {
-  opacity: 0.5;
+  opacity: 0.4;
   background-color: #f5f7fa !important;
 }
 

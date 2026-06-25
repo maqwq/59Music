@@ -41,6 +41,10 @@ bool LibraryManager::deleteSong(int id) {
     return db_->deleteSong(id);
 }
 
+bool LibraryManager::reorderSongs(int from, int to) {
+    return db_->reorderSongs(from, to);
+}
+
 SongInfo LibraryManager::getSongById(int id) {
     return db_->getSongById(id);
 }

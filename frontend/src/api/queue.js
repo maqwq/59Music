@@ -1,135 +1,85 @@
 import request, { USE_MOCK, delay } from './request'
+import { mockSongs } from '../mock/data'
 
-// ===== Mock 数据 =====
-
-const mockSongs = [
-  {
-    id: 1,
-    title: '稻香',
-    artist: '周杰伦',
-    album: '魔杰座',
-    duration: 223,
-    filePath: 'D:/Music/周杰伦/魔杰座/稻香.mp3',
-    addedTime: 1716883200,
-  },
-  {
-    id: 2,
-    title: '晴天',
-    artist: '周杰伦',
-    album: '叶惠美',
-    duration: 269,
-    filePath: 'D:/Music/周杰伦/叶惠美/晴天.mp3',
-    addedTime: 1716883200,
-  },
-  {
-    id: 3,
-    title: '七里香',
-    artist: '周杰伦',
-    album: '七里香',
-    duration: 299,
-    filePath: 'D:/Music/周杰伦/七里香/七里香.mp3',
-    addedTime: 1716883200,
-  },
-  {
-    id: 4,
-    title: '夜曲',
-    artist: '周杰伦',
-    album: '十一月的萧邦',
-    duration: 226,
-    filePath: 'D:/Music/周杰伦/十一月的萧邦/夜曲.mp3',
-    addedTime: 1716883200,
-  },
-  {
-    id: 5,
-    title: '青花瓷',
-    artist: '周杰伦',
-    album: '我很忙',
-    duration: 239,
-    filePath: 'D:/Music/周杰伦/我很忙/青花瓷.mp3',
-    addedTime: 1716883200,
-  },
+let mockItems = [
+  { type: 'song', songId: 1, song: mockSongs[0] },
+  { type: 'playlist', playlistId: 1, playlistName: '测试歌单', songs: [mockSongs[1], mockSongs[2]] },
 ]
-
-let mockQueue = [mockSongs[0], mockSongs[1], mockSongs[2]]
 
 // ===== 接口封装 =====
 
-/**
- * 获取当前播放队列
- * @returns {Promise<SongInfo[]>}
- */
+/** 获取播放队列（返回 items 数组） */
 export function getQueue() {
   if (USE_MOCK) {
-    return delay().then(() => [...mockQueue])
+    return delay().then(() => JSON.parse(JSON.stringify(mockItems)))
   }
   return request.get('/queue')
 }
 
-/**
- * 批量添加歌曲到队列末尾
- * @param {number[]} songIds 歌曲 ID 列表
- */
+/** 添加歌曲到队列（带去重） */
 export function addToQueue(songIds) {
   if (USE_MOCK) {
     return delay().then(() => {
-      const newSongs = mockSongs.filter(
-        (s) => songIds.includes(s.id) && !mockQueue.some((q) => q.id === s.id)
-      )
-      mockQueue.push(...newSongs)
-      return null
+      const added = []
+      for (const id of songIds) {
+        const exists = mockItems.some(item => item.type === 'song' && item.songId === id)
+        if (!exists) {
+          const song = mockSongs.find(s => s.id === id)
+          if (song) {
+            mockItems.push({ type: 'song', songId: id, song })
+            added.push(id)
+          }
+        }
+      }
+      return { added: added.length, skipped: songIds.length - added.length }
     })
   }
   return request.post('/queue/add', { songIds })
 }
 
-/**
- * 移除队列中指定索引的歌曲
- * @param {number} index 队列索引，从 0 开始
- */
+/** 将歌单加入队列（歌单引用） */
+export function addPlaylistToQueue(playlistId) {
+  if (USE_MOCK) {
+    return delay().then(() => {
+      mockItems.push({
+        type: 'playlist',
+        playlistId,
+        playlistName: `歌单 ${playlistId}`,
+        songs: [mockSongs[0]],
+      })
+      return null
+    })
+  }
+  return request.post('/queue/add-playlist', { playlistId })
+}
+
+/** 移除队列中指定索引的项 */
 export function removeFromQueue(index) {
   if (USE_MOCK) {
     return delay().then(() => {
-      if (index < 0 || index >= mockQueue.length) {
-        throw new Error('索引超出范围')
-      }
-      mockQueue.splice(index, 1)
+      if (index < 0 || index >= mockItems.length) throw new Error('索引超出范围')
+      mockItems.splice(index, 1)
       return null
     })
   }
   return request.delete(`/queue/${index}`)
 }
 
-/**
- * 清空播放队列
- */
+/** 清空播放队列 */
 export function clearQueue() {
   if (USE_MOCK) {
-    return delay().then(() => {
-      mockQueue = []
-      return null
-    })
+    return delay().then(() => { mockItems = []; return null })
   }
   return request.delete('/queue')
 }
 
-/**
- * 调整队列中歌曲位置
- * @param {number} from 原位置索引
- * @param {number} to 目标位置索引
- */
+/** 调整队列中项的位置 */
 export function reorderQueue(from, to) {
   if (USE_MOCK) {
     return delay().then(() => {
-      if (
-        from < 0 ||
-        from >= mockQueue.length ||
-        to < 0 ||
-        to >= mockQueue.length
-      ) {
-        throw new Error('索引超出范围')
-      }
-      const [moved] = mockQueue.splice(from, 1)
-      mockQueue.splice(to, 0, moved)
+      if (from < 0 || from >= mockItems.length || to < 0 || to >= mockItems.length) throw new Error('索引超出范围')
+      const [moved] = mockItems.splice(from, 1)
+      mockItems.splice(to, 0, moved)
       return null
     })
   }

@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import * as playerApi from '../api/player'
 import * as queueApi from '../api/queue'
+import { formatTime } from '../utils/format'
 
 /**
  * 播放器全局状态管理
@@ -222,19 +223,33 @@ export const usePlayerStore = defineStore('player', () => {
 
   /**
    * 更新当前歌曲在队列中的索引
+   * 适配新队列 items 格式（song + playlist 类型）
    */
   function updateCurrentIndex() {
     if (!currentSong.value) {
       currentIndex.value = -1
       return
     }
-    const index = queue.value.findIndex((s) => s.id === currentSong.value.id)
-    currentIndex.value = index
+    const items = queue.value
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i]
+      if (item.type === 'song' && item.songId === currentSong.value.id) {
+        currentIndex.value = i
+        return
+      }
+      if (item.type === 'playlist' && Array.isArray(item.songs)) {
+        if (item.songs.some(s => s.id === currentSong.value.id)) {
+          currentIndex.value = i
+          return
+        }
+      }
+    }
+    currentIndex.value = -1
   }
 
   /**
    * 用后端返回的新队列更新本地队列
-   * @param {Object[]} newQueue SongInfo[]
+   * @param {Object[]} newQueue items 数组
    */
   function setQueue(newQueue) {
     queue.value = newQueue ?? []
@@ -274,19 +289,6 @@ export const usePlayerStore = defineStore('player', () => {
         isPlaying.value = false
       }
     }
-  }
-
-  // ========== Helpers ==========
-
-  /**
-   * 格式化秒数为 mm:ss
-   * @param {number} seconds
-   */
-  function formatTime(seconds) {
-    if (!seconds || seconds < 0) return '00:00'
-    const m = Math.floor(seconds / 60)
-    const s = Math.floor(seconds % 60)
-    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
   }
 
   return {

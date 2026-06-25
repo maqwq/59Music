@@ -1,18 +1,41 @@
 <template>
   <el-container class="app-layout">
-    <!-- 侧边栏 -->
-    <el-aside width="200px" class="sidebar">
-      <div class="logo">59Music</div>
-      <el-menu :default-active="$route.path" router class="nav-menu">
+    <!-- 深色侧边栏 -->
+    <el-aside width="220px" class="sidebar">
+      <div class="logo">
+        <span class="logo-icon">🎵</span>
+        <span class="logo-text">59Music</span>
+      </div>
+      <el-menu
+        :default-active="$route.path"
+        router
+        class="nav-menu"
+        background-color="#1e1e2d"
+        text-color="#a0a0b8"
+        active-text-color="#ffffff"
+      >
         <el-menu-item index="/">
           <el-icon><Headset /></el-icon>
           <span>音乐库</span>
+        </el-menu-item>
+        <el-menu-item index="/playlists">
+          <el-icon><Menu /></el-icon>
+          <span>歌单</span>
         </el-menu-item>
         <el-menu-item index="/queue">
           <el-icon><List /></el-icon>
           <span>播放队列</span>
         </el-menu-item>
       </el-menu>
+
+      <!-- 底部快捷键提示 -->
+      <div class="sidebar-footer">
+        <div class="shortcut-hint">
+          <div class="hint-row"><kbd>Space</kbd> 播放/暂停</div>
+          <div class="hint-row"><kbd>← →</kbd> 切歌</div>
+          <div class="hint-row"><kbd>↑ ↓</kbd> 音量</div>
+        </div>
+      </div>
     </el-aside>
 
     <!-- 主内容区 -->
@@ -21,30 +44,54 @@
         <router-view />
       </el-main>
 
-      <!-- 底部播放栏 -->
-      <el-footer height="90px" class="player-bar">
-        <!-- 左侧：歌曲信息 -->
+      <!-- 底部播放栏（玻璃态） -->
+      <el-footer height="96px" class="player-bar">
+        <!-- 左侧：歌曲信息 + 专辑封面占位 -->
         <div class="song-info">
-          <div class="title">{{ playerStore.hasCurrentSong ? playerStore.currentSong.title : '暂无歌曲' }}</div>
-          <div class="artist">
-            {{ playerStore.hasCurrentSong ? playerStore.currentSong.artist : '-' }}
+          <div class="cover-art" :class="{ active: playerStore.hasCurrentSong }">
+            <span v-if="playerStore.hasCurrentSong" class="cover-note">🎶</span>
+            <span v-else class="cover-note muted">♪</span>
+          </div>
+          <div class="song-meta">
+            <div class="title">{{ playerStore.hasCurrentSong ? playerStore.currentSong.title : '暂无歌曲' }}</div>
+            <div class="artist">
+              {{ playerStore.hasCurrentSong ? playerStore.currentSong.artist : '选择一首歌曲开始播放' }}
+            </div>
           </div>
         </div>
 
         <!-- 中间：控制按钮 + 进度 -->
         <div class="player-center">
           <div class="controls">
-            <el-button circle size="small" :disabled="!playerStore.hasCurrentSong" @click="playerStore.previous">
-              <el-icon><Arrow-Left /></el-icon>
+            <el-button
+              circle
+              class="ctrl-btn"
+              :disabled="!playerStore.hasCurrentSong"
+              @click="playerStore.previous"
+              title="上一首 (←)"
+            >
+              <el-icon size="18"><ArrowLeft /></el-icon>
             </el-button>
-            <el-button circle size="large" :disabled="!playerStore.hasCurrentSong" @click="playerStore.togglePlay">
-              <el-icon>
-                <Video-Play v-if="!playerStore.isPlaying" />
-                <Video-Pause v-else />
+            <el-button
+              circle
+              class="ctrl-btn play-btn"
+              :disabled="!playerStore.hasCurrentSong"
+              @click="playerStore.togglePlay"
+              title="播放/暂停 (Space)"
+            >
+              <el-icon size="24">
+                <VideoPlay v-if="!playerStore.isPlaying" />
+                <VideoPause v-else />
               </el-icon>
             </el-button>
-            <el-button circle size="small" :disabled="!playerStore.hasCurrentSong" @click="playerStore.next">
-              <el-icon><Arrow-Right /></el-icon>
+            <el-button
+              circle
+              class="ctrl-btn"
+              :disabled="!playerStore.hasCurrentSong"
+              @click="playerStore.next"
+              title="下一首 (→)"
+            >
+              <el-icon size="18"><ArrowRight /></el-icon>
             </el-button>
           </div>
 
@@ -65,18 +112,31 @@
         <!-- 右侧：音量 + 模式 -->
         <div class="player-extra">
           <el-tooltip :content="modeText" placement="top">
-            <el-button circle size="small" :disabled="!playerStore.hasCurrentSong" @click="cycleMode">
-              <el-icon>
-                <Refresh-Right v-if="playerStore.mode === 'single_loop'" />
+            <el-button
+              circle
+              class="ctrl-btn"
+              size="small"
+              :disabled="!playerStore.hasCurrentSong"
+              @click="cycleMode"
+            >
+              <el-icon size="16">
+                <RefreshRight v-if="playerStore.mode === 'single_loop'" />
                 <Refresh v-else-if="playerStore.mode === 'list_loop'" />
                 <Sort v-else-if="playerStore.mode === 'shuffle'" />
-                <Arrow-Right v-else />
+                <ArrowLeftBold v-else-if="playerStore.mode === 'reverse'" />
+                <ArrowRight v-else />
               </el-icon>
             </el-button>
           </el-tooltip>
 
-          <el-button circle size="small" @click="playerStore.toggleMuted">
-            <el-icon>
+          <el-button
+            circle
+            class="ctrl-btn"
+            size="small"
+            @click="playerStore.toggleMuted"
+            title="静音"
+          >
+            <el-icon size="16">
               <Mute v-if="playerStore.muted || playerStore.volume === 0" />
               <Microphone v-else />
             </el-icon>
@@ -99,11 +159,14 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { usePlayerStore } from './stores/player'
 import { useWebSocket } from './composables/useWebSocket'
+import { useKeyboard } from './composables/useKeyboard'
 import {
   Headset,
   List,
+  Menu,
   ArrowLeft,
   ArrowRight,
+  ArrowLeftBold,
   VideoPlay,
   VideoPause,
   Mute,
@@ -114,6 +177,9 @@ import {
 } from '@element-plus/icons-vue'
 
 const playerStore = usePlayerStore()
+
+// ===== 键盘快捷键 =====
+useKeyboard()
 
 // ===== 进度条绑定 =====
 const progressValue = computed({
@@ -137,10 +203,11 @@ const volumeValue = computed({
 })
 
 // ===== 播放模式切换 =====
-const modeOrder = ['sequential', 'list_loop', 'single_loop', 'shuffle']
+const modeOrder = ['sequential', 'reverse', 'list_loop', 'single_loop', 'shuffle']
 
 const modeTextMap = {
   sequential: '顺序播放',
+  reverse: '倒序播放',
   list_loop: '列表循环',
   single_loop: '单曲循环',
   shuffle: '随机播放',
@@ -158,7 +225,6 @@ function cycleMode() {
 const { connected } = useWebSocket()
 
 onMounted(async () => {
-  // 初始加载状态 + 队列
   await playerStore.loadState()
   await playerStore.refreshQueue()
 
@@ -173,87 +239,251 @@ onMounted(async () => {
 })
 </script>
 
+<style>
+/* ===== 全局样式 ===== */
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  height: 100%;
+}
+
+/* 自定义滚动条 */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #c0c4cc;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #909399;
+}
+
+/* Element Plus 表格行 hover 优化 */
+.el-table__body tr:hover > td {
+  background-color: #f0f2ff !important;
+}
+</style>
+
 <style scoped>
 .app-layout {
   height: 100vh;
+  overflow: hidden;
 }
 
+/* ===== 深色侧边栏 ===== */
 .sidebar {
-  background-color: #f5f7fa;
-  border-right: 1px solid #e4e7ed;
+  background-color: #1e1e2d;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .logo {
-  height: 60px;
+  height: 64px;
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.logo-icon {
+  font-size: 24px;
+}
+
+.logo-text {
   font-size: 20px;
-  font-weight: bold;
-  color: #409eff;
-  border-bottom: 1px solid #e4e7ed;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: 1px;
 }
 
 .nav-menu {
-  border-right: none;
+  flex: 1;
+  border-right: none !important;
 }
 
+.nav-menu :deep(.el-menu-item) {
+  height: 48px;
+  line-height: 48px;
+  margin: 2px 8px;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.nav-menu :deep(.el-menu-item:hover) {
+  background-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+.nav-menu :deep(.el-menu-item.is-active) {
+  background-color: rgba(64, 158, 255, 0.2) !important;
+  color: #ffffff !important;
+}
+
+.sidebar-footer {
+  padding: 12px 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.shortcut-hint {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hint-row {
+  font-size: 11px;
+  color: #6a6a7a;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hint-row kbd {
+  display: inline-block;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-family: inherit;
+  color: #8a8a9a;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  min-width: 24px;
+  text-align: center;
+}
+
+/* ===== 主内容区 ===== */
 .main-area {
   display: flex;
   flex-direction: column;
+  background-color: #f8f9fc;
 }
 
 .content {
   flex: 1;
   overflow: auto;
-  background-color: #ffffff;
+  background-color: #f8f9fc;
 }
 
+/* ===== 底部播放栏（玻璃态） ===== */
 .player-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 24px;
-  background-color: #ffffff;
-  border-top: 1px solid #e4e7ed;
+  padding: 0 28px;
+  background: linear-gradient(180deg, #ffffff 0%, #fafbfc 100%);
+  border-top: 1px solid #ebeef5;
+  box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.04);
+  backdrop-filter: blur(8px);
 }
 
 /* 左侧歌曲信息 */
 .song-info {
-  width: 200px;
+  width: 220px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
   overflow: hidden;
 }
 
-.song-info .title {
-  font-weight: bold;
+.cover-art {
+  width: 52px;
+  height: 52px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #e8eaed 0%, #dde0e4 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.3s;
+}
+
+.cover-art.active {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.cover-note {
+  font-size: 20px;
+}
+
+.cover-note.muted {
+  opacity: 0.3;
+}
+
+.song-meta {
+  overflow: hidden;
+  min-width: 0;
+}
+
+.song-meta .title {
+  font-weight: 600;
   font-size: 14px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  color: #303133;
 }
 
-.song-info .artist {
+.song-meta .artist {
   font-size: 12px;
   color: #909399;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  margin-top: 2px;
 }
 
 /* 中间控制区 */
 .player-center {
   flex: 1;
-  max-width: 600px;
+  max-width: 640px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .controls {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 20px;
+}
+
+.ctrl-btn {
+  border: none !important;
+  background: transparent !important;
+  color: #606266;
+  transition: all 0.2s;
+}
+
+.ctrl-btn:hover:not(:disabled) {
+  color: #409eff;
+  background: rgba(64, 158, 255, 0.08) !important;
+}
+
+.ctrl-btn.play-btn {
+  width: 44px !important;
+  height: 44px !important;
+  background: linear-gradient(135deg, #409eff 0%, #337ecc 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.35);
+}
+
+.ctrl-btn.play-btn:hover:not(:disabled) {
+  box-shadow: 0 4px 16px rgba(64, 158, 255, 0.5);
+  transform: scale(1.06);
 }
 
 .progress-area {
@@ -264,10 +494,11 @@ onMounted(async () => {
 }
 
 .progress-area .time {
-  font-size: 12px;
+  font-size: 11px;
   color: #909399;
   min-width: 36px;
   text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 
 .progress-slider {
@@ -276,11 +507,11 @@ onMounted(async () => {
 
 /* 右侧功能区 */
 .player-extra {
-  width: 200px;
+  width: 220px;
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 12px;
+  gap: 10px;
 }
 
 .volume-slider {

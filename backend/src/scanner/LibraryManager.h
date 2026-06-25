@@ -25,6 +25,9 @@ public:
     // 删除歌曲（不删除原文件）
     bool deleteSong(int id);
 
+    // 调整歌曲顺序
+    bool reorderSongs(int from, int to);
+
     // 获取单首歌曲
     SongInfo getSongById(int id);
 

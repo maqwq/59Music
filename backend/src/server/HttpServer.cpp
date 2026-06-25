@@ -57,6 +57,12 @@ bool HttpServer::init(const std::string& dbPath) {
 
     // ── 播放队列 ──
     queue_ = std::make_unique<PlayQueue>();
+    queue_->setSongResolver([this](int songId) {
+        return db_->getSongById(songId);
+    });
+    queue_->setPlaylistResolver([this](int playlistId) {
+        return db_->getPlaylistSongs(playlistId);
+    });
 
     // ── HTTP 服务器 ──
     svr_ = std::make_unique<httplib::Server>();
@@ -122,10 +128,10 @@ bool HttpServer::playSongById(int songId) {
               << " path=" << song.filePath << std::endl;
     if (song.id == 0) return false;
 
-    // 查找歌在队列中的位置
-    const auto& q = queue_->getQueue();
-    for (int i = 0; i < static_cast<int>(q.size()); ++i) {
-        if (q[i].id == songId) {
+    // 查找歌在队列 Song 类型项中的位置
+    const auto& items = queue_->getItems();
+    for (int i = 0; i < static_cast<int>(items.size()); ++i) {
+        if (items[i].type == QueueItemType::Song && items[i].songId == songId) {
             std::clog << "[LOG] 在队列中第 " << i << " 位" << std::endl;
             queue_->setCurrentIndex(i);
             bool ok = engine_->play(song.filePath);
@@ -135,7 +141,7 @@ bool HttpServer::playSongById(int songId) {
     }
     // 不在队列中：加入队列末尾，再设为当前
     std::clog << "[LOG] 不在播放队列中，自动加入队列" << std::endl;
-    queue_->addSongs({song});
+    queue_->addSongs({songId});
     queue_->setCurrentIndex(queue_->size() - 1);
     bool ok = engine_->play(song.filePath);
     std::clog << "[LOG] 播放结果: " << ok << std::endl;
@@ -188,9 +194,25 @@ void HttpServer::wsBroadcastProgress() {
 }
 
 void HttpServer::wsBroadcastQueueChanged() {
+    Json arr = Json::array();
+    for (const auto& item : queue_->getItems()) {
+        Json obj;
+        obj["type"] = (item.type == QueueItemType::Song) ? "song" : "playlist";
+        if (item.type == QueueItemType::Song) {
+            obj["songId"] = item.songId;
+            SongInfo s = db_->getSongById(item.songId);
+            obj["song"] = s.id ? Json::parse(songsToJsonArray({s}).dump()).at(0) : Json(nullptr);
+        } else {
+            obj["playlistId"] = item.playlistId;
+            obj["playlistName"] = item.playlistName;
+            auto songs = db_->getPlaylistSongs(item.playlistId);
+            obj["songs"] = Json::parse(songsToJsonArray(songs).dump());
+        }
+        arr.push_back(obj);
+    }
     Json msg;
     msg["type"] = "queue_changed";
-    msg["data"] = songsToJsonArray(queue_->getQueue());
+    msg["data"] = arr;
     wsBroadcast(msg.dump());
 }
 
@@ -438,7 +460,28 @@ void HttpServer::registerAllRoutes() {
 
     svr_->Get("/api/v1/queue", wrap([this](const httplib::Request&, httplib::Response& res) {
         std::lock_guard lock(stateMutex_);
-        res.set_content(successResponse(songsToJsonArray(queue_->getQueue())).dump(), "application/json");
+        Json arr = Json::array();
+        for (const auto& item : queue_->getItems()) {
+            Json obj;
+            if (item.type == QueueItemType::Song) {
+                obj["type"] = "song";
+                obj["songId"] = item.songId;
+                SongInfo s = db_->getSongById(item.songId);
+                if (s.id) {
+                    obj["song"] = Json::parse(songsToJsonArray({s}).dump()).at(0);
+                } else {
+                    obj["song"] = nullptr;
+                }
+            } else {
+                obj["type"] = "playlist";
+                obj["playlistId"] = item.playlistId;
+                obj["playlistName"] = item.playlistName;
+                auto songs = db_->getPlaylistSongs(item.playlistId);
+                obj["songs"] = Json::parse(songsToJsonArray(songs).dump());
+            }
+            arr.push_back(obj);
+        }
+        res.set_content(successResponse(arr).dump(), "application/json");
     }));
 
     svr_->Post("/api/v1/queue/add", wrap([this](const httplib::Request& req, httplib::Response& res) {
@@ -449,22 +492,46 @@ void HttpServer::registerAllRoutes() {
             res.set_content(errorResponse("请求体格式错误").dump(), "application/json");
             return;
         }
-        std::vector<SongInfo> songs;
+        std::vector<int> ids;
         for (const auto& idJson : body["songIds"]) {
             int id = idJson.get<int>();
-            SongInfo song = library_->getSongById(id);
-            if (song.id > 0) {
-                songs.push_back(song);
+            if (library_->getSongById(id).id > 0) {
+                ids.push_back(id);
             }
         }
-        if (!songs.empty()) {
-            queue_->addSongs(songs);
+        int added = 0, skipped = static_cast<int>(ids.size());
+        if (!ids.empty()) {
+            added = queue_->addSongs(ids);
+            skipped = static_cast<int>(ids.size()) - added;
         }
-        res.set_content(successResponse(nullptr).dump(), "application/json");
+        res.set_content(successResponse({{"added", added}, {"skipped", skipped}}).dump(), "application/json");
         wsBroadcastQueueChanged();
     }));
 
-    // DELETE /queue/{index} — cpp-httplib 用正则捕获: R"(/api/v1/queue/(\d+))"
+    svr_->Post("/api/v1/queue/add-playlist", wrap([this](const httplib::Request& req, httplib::Response& res) {
+        std::lock_guard lock(stateMutex_);
+        auto body = Json::parse(req.body, nullptr, false);
+        if (body.is_discarded() || !body.contains("playlistId")) {
+            res.status = 400;
+            res.set_content(errorResponse("请求体格式错误").dump(), "application/json");
+            return;
+        }
+        int playlistId = body["playlistId"].get<int>();
+        auto info = db_->getPlaylistById(playlistId);
+        if (info.id == 0) {
+            res.status = 404;
+            res.set_content(errorResponse("歌单不存在").dump(), "application/json");
+            return;
+        }
+        queue_->addPlaylist(playlistId, info.name);
+        res.set_content(successResponse({
+            {"playlistId", playlistId},
+            {"playlistName", info.name}
+        }).dump(), "application/json");
+        wsBroadcastQueueChanged();
+    }));
+
+    // DELETE /queue/{index} — cpp-httplib 用正则捕获
     svr_->Delete("/api/v1/queue/(\\d+)", wrap([this](const httplib::Request& req, httplib::Response& res) {
         std::lock_guard lock(stateMutex_);
         int index = std::stoi(req.matches[1]);
@@ -585,6 +652,36 @@ void HttpServer::registerAllRoutes() {
         res.set_content(successResponse(nullptr).dump(), "application/json");
     }));
 
+    svr_->Put("/api/v1/library/songs/(\\d+)", wrap([this](const httplib::Request& req, httplib::Response& res) {
+        int id = std::stoi(req.matches[1]);
+        auto body = Json::parse(req.body, nullptr, false);
+        if (body.is_discarded()) {
+            res.status = 400;
+            res.set_content(errorResponse("请求体格式错误").dump(), "application/json");
+            return;
+        }
+        std::string title  = body.value("title", "");
+        std::string artist = body.value("artist", "");
+        if (!db_->updateSongMeta(id, title, artist)) {
+            res.status = 404;
+            res.set_content(errorResponse("歌曲不存在").dump(), "application/json");
+            return;
+        }
+        res.set_content(successResponse(nullptr).dump(), "application/json");
+    }));
+
+    svr_->Post("/api/v1/library/songs/reorder", wrap([this](const httplib::Request& req, httplib::Response& res) {
+        int from = std::stoi(req.get_param_value("from"));
+        int to   = std::stoi(req.get_param_value("to"));
+
+        if (!library_->reorderSongs(from, to)) {
+            res.status = 400;
+            res.set_content(errorResponse("索引超出范围").dump(), "application/json");
+            return;
+        }
+        res.set_content(successResponse(nullptr).dump(), "application/json");
+    }));
+
     svr_->Get("/api/v1/library/stats", wrap([this](const httplib::Request&, httplib::Response& res) {
         res.set_content(successResponse({
             {"totalSongs",    library_->getTotalSongs()},
@@ -592,6 +689,164 @@ void HttpServer::registerAllRoutes() {
             {"totalArtists",  library_->getTotalArtists()},
             {"totalAlbums",   library_->getTotalAlbums()}
         }).dump(), "application/json");
+    }));
+
+    // ======================== 歌单 ========================
+
+    // 随机生成歌单 — 放在 /:id 之前，避免 "generate" 被当成 id
+    svr_->Post("/api/v1/playlists/generate", wrap([this](const httplib::Request& req, httplib::Response& res) {
+        auto body = Json::parse(req.body, nullptr, false);
+        if (body.is_discarded()) {
+            res.status = 400;
+            res.set_content(errorResponse("请求体格式错误").dump(), "application/json");
+            return;
+        }
+        int count = body.value("count", 0);
+        std::string name = body.value("name", "随机歌单");
+        int total = db_->getTotalSongs();
+        if (count <= 0 || count > total) {
+            res.status = 400;
+            res.set_content(errorResponse("数字需在 1 到 " + std::to_string(total) + " 之间").dump(), "application/json");
+            return;
+        }
+        auto songs = db_->getRandomSongs(count);
+        int playlistId = db_->createPlaylist(name);
+        std::vector<int> songIds;
+        for (auto& s : songs) songIds.push_back(s.id);
+        db_->addSongsToPlaylist(playlistId, songIds);
+        res.set_content(successResponse({{"id", playlistId}, {"songCount", static_cast<int>(songs.size())}}).dump(), "application/json");
+    }));
+
+    svr_->Get("/api/v1/playlists", wrap([this](const httplib::Request&, httplib::Response& res) {
+        auto playlists = db_->getAllPlaylists();
+        Json arr = Json::array();
+        for (auto& p : playlists) {
+            arr.push_back({
+                {"id",        p.id},
+                {"name",      p.name},
+                {"songCount", p.songCount},
+                {"createdAt", p.createdAt},
+                {"updatedAt", p.updatedAt}
+            });
+        }
+        res.set_content(successResponse(arr).dump(), "application/json");
+    }));
+
+    svr_->Post("/api/v1/playlists", wrap([this](const httplib::Request& req, httplib::Response& res) {
+        auto body = Json::parse(req.body, nullptr, false);
+        if (body.is_discarded()) {
+            res.status = 400;
+            res.set_content(errorResponse("请求体格式错误").dump(), "application/json");
+            return;
+        }
+        std::string name = body.value("name", "新建歌单");
+        int id = db_->createPlaylist(name);
+        if (body.contains("songIds") && body["songIds"].is_array()) {
+            std::vector<int> songIds;
+            for (auto& sid : body["songIds"]) songIds.push_back(sid.get<int>());
+            db_->addSongsToPlaylist(id, songIds);
+        }
+        auto info = db_->getPlaylistById(id);
+        res.set_content(successResponse({
+            {"id",        info.id},
+            {"name",      info.name},
+            {"songCount", info.songCount}
+        }).dump(), "application/json");
+    }));
+
+    svr_->Get("/api/v1/playlists/(\\d+)", wrap([this](const httplib::Request& req, httplib::Response& res) {
+        int id = std::stoi(req.matches[1]);
+        auto info = db_->getPlaylistById(id);
+        if (info.id == 0) {
+            res.status = 404;
+            res.set_content(errorResponse("歌单不存在").dump(), "application/json");
+            return;
+        }
+        auto songs = db_->getPlaylistSongs(id);
+        res.set_content(successResponse({
+            {"id",        info.id},
+            {"name",      info.name},
+            {"songCount", info.songCount},
+            {"songs",     songsToJsonArray(songs)}
+        }).dump(), "application/json");
+    }));
+
+    svr_->Put("/api/v1/playlists/(\\d+)", wrap([this](const httplib::Request& req, httplib::Response& res) {
+        int id = std::stoi(req.matches[1]);
+        auto body = Json::parse(req.body, nullptr, false);
+        if (body.is_discarded()) {
+            res.status = 400;
+            res.set_content(errorResponse("请求体格式错误").dump(), "application/json");
+            return;
+        }
+        std::string name = body.value("name", "");
+        if (!db_->renamePlaylist(id, name)) {
+            res.status = 404;
+            res.set_content(errorResponse("歌单不存在").dump(), "application/json");
+            return;
+        }
+        res.set_content(successResponse(nullptr).dump(), "application/json");
+    }));
+
+    svr_->Delete("/api/v1/playlists/(\\d+)", wrap([this](const httplib::Request& req, httplib::Response& res) {
+        int id = std::stoi(req.matches[1]);
+        if (!db_->deletePlaylist(id)) {
+            res.status = 404;
+            res.set_content(errorResponse("歌单不存在").dump(), "application/json");
+            return;
+        }
+        res.set_content(successResponse(nullptr).dump(), "application/json");
+    }));
+
+    svr_->Post("/api/v1/playlists/(\\d+)/songs", wrap([this](const httplib::Request& req, httplib::Response& res) {
+        int id = std::stoi(req.matches[1]);
+        auto body = Json::parse(req.body, nullptr, false);
+        if (body.is_discarded() || !body.contains("songIds")) {
+            res.status = 400;
+            res.set_content(errorResponse("请求体格式错误").dump(), "application/json");
+            return;
+        }
+        std::vector<int> songIds;
+        for (auto& sid : body["songIds"]) songIds.push_back(sid.get<int>());
+        int added = db_->addSongsToPlaylist(id, songIds);
+        res.set_content(successResponse({{"addedCount", added}}).dump(), "application/json");
+    }));
+
+    svr_->Delete("/api/v1/playlists/(\\d+)/songs/(\\d+)", wrap([this](const httplib::Request& req, httplib::Response& res) {
+        int playlistId = std::stoi(req.matches[1]);
+        int songId     = std::stoi(req.matches[2]);
+        if (!db_->removeSongFromPlaylist(playlistId, songId)) {
+            res.status = 404;
+            res.set_content(errorResponse("歌曲不在歌单中").dump(), "application/json");
+            return;
+        }
+        res.set_content(successResponse(nullptr).dump(), "application/json");
+    }));
+
+    svr_->Post("/api/v1/playlists/(\\d+)/reorder", wrap([this](const httplib::Request& req, httplib::Response& res) {
+        int id   = std::stoi(req.matches[1]);
+        int from = std::stoi(req.get_param_value("from"));
+        int to   = std::stoi(req.get_param_value("to"));
+        if (!db_->reorderPlaylistSongs(id, from, to)) {
+            res.status = 400;
+            res.set_content(errorResponse("索引超出范围").dump(), "application/json");
+            return;
+        }
+        res.set_content(successResponse(nullptr).dump(), "application/json");
+    }));
+
+    svr_->Post("/api/v1/playlists/(\\d+)/add-to-queue", wrap([this](const httplib::Request& req, httplib::Response& res) {
+        int id = std::stoi(req.matches[1]);
+        auto info = db_->getPlaylistById(id);
+        if (info.id == 0) {
+            res.status = 404;
+            res.set_content(errorResponse("歌单不存在").dump(), "application/json");
+            return;
+        }
+        auto songs = db_->getPlaylistSongs(id);
+        queue_->addPlaylist(id, info.name);
+        wsBroadcastQueueChanged();
+        res.set_content(successResponse({{"addedCount", static_cast<int>(songs.size())}}).dump(), "application/json");
     }));
 
     // ======================== WebSocket ========================
@@ -614,9 +869,25 @@ void HttpServer::registerAllRoutes() {
         }
         {
             std::lock_guard<std::mutex> lock(stateMutex_);
+            Json arr = Json::array();
+            for (const auto& item : queue_->getItems()) {
+                Json obj;
+                if (item.type == QueueItemType::Song) {
+                    obj["type"] = "song";
+                    obj["songId"] = item.songId;
+                    SongInfo s = db_->getSongById(item.songId);
+                    obj["song"] = s.id ? Json::parse(songsToJsonArray({s}).dump()).at(0) : Json(nullptr);
+                } else {
+                    obj["type"] = "playlist";
+                    obj["playlistId"] = item.playlistId;
+                    obj["playlistName"] = item.playlistName;
+                    obj["songs"] = Json::parse(songsToJsonArray(db_->getPlaylistSongs(item.playlistId)).dump());
+                }
+                arr.push_back(obj);
+            }
             Json msg;
             msg["type"] = "queue_changed";
-            msg["data"] = songsToJsonArray(queue_->getQueue());
+            msg["data"] = arr;
             ws.send(msg.dump());
         }
 

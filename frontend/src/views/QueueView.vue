@@ -1,117 +1,181 @@
 <template>
   <div class="queue-view">
-    <!-- 标题栏 -->
+    <!-- 头部 -->
     <div class="queue-header">
       <div class="title-section">
         <h2>播放队列</h2>
-        <span class="subtitle">共 {{ playerStore.queue.length }} 首</span>
+        <span class="subtitle">{{ expandedCount }} 首歌 · {{ playerStore.queue.length }} 项</span>
       </div>
-      <el-button type="danger" :disabled="playerStore.queue.length === 0" @click="handleClear">
+      <el-button
+        type="danger"
+        plain
+        size="large"
+        @click="handleClear"
+        :disabled="playerStore.queue.length === 0"
+      >
         清空队列
       </el-button>
     </div>
 
     <!-- 批量操作栏 -->
     <div v-if="selection.selectedCount > 0" class="batch-toolbar">
-      <span class="batch-info">已选择 {{ selection.selectedCount }} 首歌曲</span>
-      <el-button type="danger" @click="handleRemoveSelected">
-        删除
-      </el-button>
+      <span class="batch-info">
+        <el-icon><Check /></el-icon>
+        已选择 {{ selection.selectedCount }} 项
+      </span>
+      <el-button size="small" type="danger" @click="handleRemoveSelected">删除</el-button>
     </div>
 
     <!-- 队列表格 -->
-    <el-table
-      ref="queueTable"
-      :data="queueWithIndex"
-      row-key="id"
-      stripe
-      style="width: 100%"
-      :row-class-name="rowClassName"
-      @row-dblclick="handlePlay"
-    >
-      <!-- 自定义选择列 -->
-      <el-table-column width="55">
-        <template #header>
-          <el-checkbox
-            :model-value="selection.isAllSelected"
-            :indeterminate="selection.isIndeterminate"
-            @change="selection.handleSelectAllChange"
-          />
-        </template>
-        <template #default="{ row }">
-          <el-checkbox
-            :model-value="selection.isSelected(row)"
-            @mousedown.prevent="(e) => selection.startDrag(e, row)"
-            @change="selection.toggle(row)"
-            @mouseenter="selection.onItemEnter(row)"
-          />
-        </template>
-      </el-table-column>
+    <div class="table-wrapper" v-if="playerStore.queue.length > 0">
+      <el-table
+        ref="queueTable"
+        :data="queueWithIndex"
+        row-key="key"
+        :row-class-name="getRowClass"
+        class="queue-table"
+        @row-dblclick="handleRowDblClick"
+      >
+        <!-- 复选框列 -->
+        <el-table-column width="50">
+          <template #header>
+            <el-checkbox
+              :model-value="selection.isAllSelected"
+              :indeterminate="selection.isIndeterminate"
+              @change="selection.handleSelectAllChange"
+            />
+          </template>
+          <template #default="{ row }">
+            <el-checkbox
+              :model-value="selection.isSelected(row)"
+              @mousedown.prevent="(e) => selection.startDrag(e, row)"
+              @change="selection.toggle(row)"
+              @mouseenter="selection.onItemEnter(row)"
+            />
+          </template>
+        </el-table-column>
 
-      <el-table-column label="#" width="60">
-        <template #default="{ row, $index }">
-          <span v-if="$index === playerStore.currentIndex" class="playing-indicator">
-            <el-icon><Video-Play /></el-icon>
-          </span>
-          <span v-else>{{ $index + 1 }}</span>
-        </template>
-      </el-table-column>
+        <!-- # 列 -->
+        <el-table-column width="60" align="center">
+          <template #default="{ $index }">
+            <div v-if="$index === playerStore.currentIndex" class="playing-badge">
+              <el-icon color="#409eff" size="16"><VideoPlay /></el-icon>
+            </div>
+            <span v-else class="track-num">{{ $index + 1 }}</span>
+          </template>
+        </el-table-column>
 
-      <el-table-column prop="title" label="歌名" min-width="180" />
+        <!-- 信息列 -->
+        <el-table-column label="歌曲 / 歌单" min-width="300">
+          <template #default="{ row }">
+            <!-- 歌单类型 -->
+            <template v-if="row.type === 'playlist'">
+              <div class="playlist-row">
+                <span class="playlist-icon">🎵</span>
+                <span class="playlist-name">{{ row.playlistName }}</span>
+                <el-tag size="small" type="info" effect="plain">{{ row.songs?.length || 0 }}首</el-tag>
+              </div>
+            </template>
+            <!-- 单曲类型 -->
+            <template v-else>
+              <span class="song-title">{{ row.song?.title || '(已删除)' }}</span>
+              <span class="song-artist">{{ row.song?.artist || '' }}</span>
+            </template>
+          </template>
+        </el-table-column>
 
-      <el-table-column prop="artist" label="歌手" min-width="140" />
+        <!-- 时长 -->
+        <el-table-column width="100" align="center">
+          <template #default="{ row }">
+            <span class="duration-cell" v-if="row.type === 'song'">
+              {{ formatTime(row.song?.duration) }}
+            </span>
+            <span class="duration-cell" v-else>
+              {{ formatTime(totalDuration(row.songs)) }}
+            </span>
+          </template>
+        </el-table-column>
 
-      <el-table-column prop="album" label="专辑" min-width="160" />
+        <!-- 操作 -->
+        <el-table-column width="140" fixed="right" align="center">
+          <template #default="{ row }">
+            <el-button
+              v-if="row.type === 'song'"
+              link
+              type="primary"
+              size="small"
+              @click="handlePlaySong(row.song)"
+            >
+              <el-icon><VideoPlay /></el-icon> 播放
+            </el-button>
+            <el-button link type="danger" size="small" @click="handleRemove(row._index)">
+              删除
+            </el-button>
+          </template>
+        </el-table-column>
 
-      <el-table-column label="时长" width="100">
-        <template #default="{ row }">
-          {{ formatTime(row.duration) }}
-        </template>
-      </el-table-column>
+        <!-- 歌单展开 -->
+        <el-table-column type="expand">
+          <template #default="{ row }">
+            <div v-if="row.type === 'playlist'" class="playlist-songs">
+              <div
+                v-for="(song, si) in row.songs"
+                :key="si"
+                class="playlist-song-item"
+                @dblclick="handlePlaySong(song)"
+              >
+                <span class="song-idx">{{ si + 1 }}.</span>
+                <span class="ps-title">{{ song.title }}</span>
+                <span class="ps-artist">{{ song.artist }}</span>
+                <span class="ps-duration">{{ formatTime(song.duration) }}</span>
+              </div>
+              <el-empty v-if="!row.songs || row.songs.length === 0" description="歌单为空" :image-size="40" />
+            </div>
+          </template>
+        </el-table-column>
+      </el-table>
+    </div>
 
-      <el-table-column label="操作" width="160" fixed="right">
-        <template #default="{ row }">
-          <el-button link type="primary" @click="handlePlay(row)">播放</el-button>
-          <el-button link type="danger" @click="handleRemove(row.index)">删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <!-- 空状态 -->
-    <el-empty v-if="playerStore.queue.length === 0" description="队列是空的，去音乐库添加歌曲吧" />
+    <el-empty v-else description="队列是空的，去音乐库添加歌曲吧" :image-size="80" />
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { VideoPlay } from '@element-plus/icons-vue'
 import { usePlayerStore } from '../stores/player'
 import { removeFromQueue, clearQueue, reorderQueue } from '../api/queue'
 import { useSelection } from '../composables/useSelection'
 import { useSortableRows } from '../composables/useSortableRows'
+import { formatTime } from '../utils/format'
+import { VideoPlay, Check } from '@element-plus/icons-vue'
 
 const playerStore = usePlayerStore()
-
 const queueTable = ref(null)
 
-/**
- * 队列表格数据，补充 index 字段
- * 队列中同一首歌可能出现多次，所以用 index 作为唯一 key
- */
+// 为每项生成稳定 key + 保留原始索引（不使用 Date.now()，避免不必要的 DOM 重建）
 const queueWithIndex = computed(() =>
-  playerStore.queue.map((song, index) => ({ ...song, index }))
+  playerStore.queue.map((item, i) => ({ ...item, key: `${item.type}-${i}`, _index: i }))
 )
 
-const selection = useSelection(queueWithIndex, { key: 'index' })
+const selection = useSelection(computed(() => queueWithIndex.value), { key: 'key' })
 
+const expandedCount = computed(() => {
+  let count = 0
+  for (const item of playerStore.queue) {
+    if (item.type === 'song') count++
+    else if (item.type === 'playlist') count += item.songs?.length || 0
+  }
+  return count
+})
+
+// 拖拽排序
 useSortableRows(queueTable, {
-  data: computed(() => playerStore.queue),
+  data: computed(() => queueWithIndex.value),
   onSort: async (oldIndex, newIndex) => {
     try {
       await reorderQueue(oldIndex, newIndex)
       await playerStore.refreshQueue()
-      ElMessage.success('队列顺序已更新')
     } catch {
       ElMessage.error('排序失败')
       await playerStore.refreshQueue()
@@ -125,105 +189,76 @@ onMounted(() => {
 
 // ===== 事件处理 =====
 
-function handlePlay(row) {
-  const song = { ...row }
-  delete song.index
-  playerStore.playSong(song)
-  ElMessage.success(`开始播放：${song.title}`)
+function getRowClass({ row }) {
+  return row.type === 'playlist' ? 'playlist-item-row' : ''
+}
+
+function handleRowDblClick(row) {
+  if (row.type === 'song' && row.song) {
+    playerStore.playSong(row.song)
+  }
+}
+
+function handlePlaySong(song) {
+  if (song) playerStore.playSong(song)
 }
 
 async function handleRemove(index) {
   try {
     await removeFromQueue(index)
     await playerStore.refreshQueue()
-    ElMessage.success('已从队列移除')
   } catch {
     ElMessage.error('移除失败')
   }
 }
 
 async function handleRemoveSelected() {
-  const count = selection.selectedCount
-  if (count === 0) return
+  const indices = selection.selectedItems
+    .map(item => queueWithIndex.value.findIndex(q => q.key === item.key))
+    .filter(i => i >= 0)
+    .sort((a, b) => b - a)
 
-  try {
-    await ElMessageBox.confirm(
-      `确定从队列中移除选中的 ${count} 首歌曲吗？`,
-      '批量移除确认',
-      { confirmButtonText: '移除', cancelButtonText: '取消', type: 'warning' }
-    )
-
-    // 按索引从大到小删除，避免删除过程中索引变化导致删错
-    const indices = selection.selectedItems
-      .map((item) => item.index)
-      .sort((a, b) => b - a)
-
-    for (const index of indices) {
-      await removeFromQueue(index)
-    }
-
-    selection.clear()
-    await playerStore.refreshQueue()
-    ElMessage.success(`已移除 ${count} 首歌曲`)
-  } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error('移除失败')
-    }
+  for (const idx of indices) {
+    await removeFromQueue(idx)
   }
+  selection.clear()
+  await playerStore.refreshQueue()
+  ElMessage.success(`已删除 ${indices.length} 项`)
 }
 
 async function handleClear() {
   try {
-    await ElMessageBox.confirm('确定清空当前播放队列吗？', '清空确认', {
-      confirmButtonText: '清空',
-      cancelButtonText: '取消',
-      type: 'warning',
-    })
+    await ElMessageBox.confirm('确定清空整个播放队列吗？', '确认', { type: 'warning' })
     await clearQueue()
-    await playerStore.refreshQueue()
+    playerStore.queue = []
     playerStore.currentSong = null
     playerStore.currentPosition = 0
     playerStore.duration = 0
     playerStore.isPlaying = false
     playerStore.currentIndex = -1
-    selection.clear()
-    ElMessage.success('队列已清空')
   } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error('清空失败')
-    }
+    if (error !== 'cancel') ElMessage.error('清空失败')
   }
 }
 
-// ===== 表格高亮当前播放行 =====
-
-function rowClassName({ rowIndex }) {
-  if (rowIndex === playerStore.currentIndex) {
-    return 'current-playing-row'
-  }
-  return ''
-}
-
-// ===== 格式化 =====
-
-function formatTime(seconds) {
-  if (!seconds || seconds < 0) return '00:00'
-  const m = Math.floor(seconds / 60)
-  const s = Math.floor(seconds % 60)
-  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+function totalDuration(songs) {
+  if (!songs) return 0
+  return songs.reduce((sum, s) => sum + (s.duration || 0), 0)
 }
 </script>
 
 <style scoped>
 .queue-view {
-  padding: 20px;
+  padding: 24px;
+  max-width: 1200px;
 }
 
+/* ===== 头部 ===== */
 .queue-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: 24px;
 }
 
 .title-section {
@@ -234,7 +269,9 @@ function formatTime(seconds) {
 
 .title-section h2 {
   margin: 0;
-  font-size: 20px;
+  font-size: 22px;
+  font-weight: 700;
+  color: #303133;
 }
 
 .subtitle {
@@ -242,39 +279,141 @@ function formatTime(seconds) {
   color: #909399;
 }
 
+/* ===== 批量操作栏 ===== */
 .batch-toolbar {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 12px;
   margin-bottom: 12px;
-  padding: 8px 12px;
-  background-color: #ecf5ff;
-  border: 1px solid #d9ecff;
-  border-radius: 4px;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, #fef0f0, #fde2e2);
+  border: 1px solid #fde2e2;
+  border-radius: 8px;
 }
 
 .batch-info {
   font-size: 13px;
-  color: #606266;
-  margin-right: 8px;
-}
-
-.playing-indicator {
-  color: #409eff;
+  color: #f56c6c;
+  font-weight: 500;
   display: flex;
   align-items: center;
+  gap: 6px;
 }
 
-:deep(.current-playing-row) {
-  background-color: #ecf5ff !important;
+/* ===== 表格 ===== */
+.table-wrapper {
+  background: #ffffff;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
-:deep(.current-playing-row td) {
-  background-color: #ecf5ff !important;
+.queue-table :deep(.el-table__header th) {
+  background: #fafbfc;
+  color: #606266;
+  font-weight: 600;
+  font-size: 13px;
+  border-bottom: 2px solid #ebeef5;
+}
+
+.queue-table :deep(.el-table__body tr) {
+  transition: background-color 0.15s;
+}
+
+.track-num {
+  color: #909399;
+  font-size: 13px;
+}
+
+.playing-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.duration-cell {
+  color: #909399;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ===== 歌单行 ===== */
+.playlist-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  user-select: none;
+}
+
+.playlist-icon {
+  font-size: 18px;
+}
+
+.playlist-name {
+  font-weight: 500;
+}
+
+.song-title {
+  margin-right: 12px;
+  font-weight: 500;
+}
+
+.song-artist {
+  color: #909399;
+  font-size: 13px;
+}
+
+/* ===== 歌单展开 ===== */
+.playlist-songs {
+  padding: 8px 0;
+}
+
+.playlist-song-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 24px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background-color 0.15s;
+}
+
+.playlist-song-item:hover {
+  background: #f0f2ff;
+}
+
+.song-idx {
+  color: #909399;
+  width: 28px;
+  text-align: right;
+  font-size: 13px;
+}
+
+.ps-title {
+  flex: 1;
+  font-size: 14px;
+}
+
+.ps-artist {
+  color: #909399;
+  font-size: 13px;
+  width: 120px;
+}
+
+.ps-duration {
+  color: #909399;
+  font-size: 13px;
+  width: 48px;
+  text-align: right;
+}
+
+/* ===== 行样式 ===== */
+:deep(.playlist-item-row) {
+  background-color: #f9fafb;
 }
 
 :deep(.sortable-ghost) {
-  opacity: 0.5;
+  opacity: 0.4;
   background-color: #f5f7fa !important;
 }
 
