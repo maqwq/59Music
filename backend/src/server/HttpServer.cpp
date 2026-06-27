@@ -5,6 +5,7 @@
 #include "player/PlayerEngine.h"
 #include "player/PlayQueue.h"
 #include "models/PlayMode.h"
+#include "models/BackgroundInfo.h"
 
 #include <httplib.h>
 #include <iostream>
@@ -847,6 +848,104 @@ void HttpServer::registerAllRoutes() {
         queue_->addPlaylist(id, info.name);
         wsBroadcastQueueChanged();
         res.set_content(successResponse({{"addedCount", static_cast<int>(songs.size())}}).dump(), "application/json");
+    }));
+
+    // ======================== 背景 API ========================
+
+    svr_->Get("/api/v1/backgrounds", wrap([this](const httplib::Request&, httplib::Response& res) {
+        auto bgs = db_->getAllBackgrounds();
+        Json arr = Json::array();
+        for (const auto& bg : bgs) {
+            arr.push_back(bg);
+        }
+        res.set_content(successResponse(arr).dump(), "application/json");
+    }));
+
+    svr_->Get("/api/v1/backgrounds/default", wrap([this](const httplib::Request&, httplib::Response& res) {
+        auto bg = db_->getDefaultBackground();
+        if (bg.id == 0) {
+            res.set_content(successResponse(nullptr).dump(), "application/json");
+        } else {
+            res.set_content(successResponse(bg).dump(), "application/json");
+        }
+    }));
+
+    svr_->Post("/api/v1/backgrounds", wrap([this](const httplib::Request& req, httplib::Response& res) {
+        std::string name = req.get_param_value("name");
+        std::string filePath = req.get_param_value("filePath");
+
+        if (filePath.empty()) {
+            res.status = 400;
+            res.set_content(errorResponse("缺少 filePath 参数").dump(), "application/json");
+            return;
+        }
+
+        if (filePath.find("..") != std::string::npos) {
+            res.status = 400;
+            res.set_content(errorResponse("非法路径").dump(), "application/json");
+            return;
+        }
+
+        std::error_code ec;
+#ifdef _WIN32
+        std::wstring wPath = utf8ToWide(filePath);
+        std::wstring wCanonical = std::filesystem::weakly_canonical(wPath, ec).wstring();
+        if (ec || !std::filesystem::exists(wCanonical, ec) || !std::filesystem::is_regular_file(wCanonical, ec)) {
+            res.status = 400;
+            res.set_content(errorResponse("文件不存在或不可访问").dump(), "application/json");
+            return;
+        }
+        int wideLen = static_cast<int>(wCanonical.size());
+        int utf8Len = WideCharToMultiByte(CP_UTF8, 0, wCanonical.c_str(), wideLen, nullptr, 0, nullptr, nullptr);
+        std::string canonical(utf8Len, '\0');
+        WideCharToMultiByte(CP_UTF8, 0, wCanonical.c_str(), wideLen, &canonical[0], utf8Len, nullptr, nullptr);
+#else
+        std::string canonical = std::filesystem::weakly_canonical(filePath, ec).string();
+        if (ec || !std::filesystem::exists(canonical) || !std::filesystem::is_regular_file(canonical)) {
+            res.status = 400;
+            res.set_content(errorResponse("文件不存在或不可访问").dump(), "application/json");
+            return;
+        }
+#endif
+
+        if (name.empty()) {
+            name = std::filesystem::path(canonical).filename().string();
+        }
+
+        BackgroundInfo bg;
+        bg.filePath = canonical;
+        bg.name = name;
+        bg.addedTime = static_cast<int64_t>(std::time(nullptr));
+        bg.isDefault = false;
+
+        if (!db_->insertBackground(bg)) {
+            res.status = 400;
+            res.set_content(errorResponse("背景已存在").dump(), "application/json");
+            return;
+        }
+
+        auto savedBg = db_->getBackgroundById(static_cast<int>(sqlite3_last_insert_rowid(db_->getDb())));
+        res.set_content(successResponse(savedBg).dump(), "application/json");
+    }));
+
+    svr_->Post("/api/v1/backgrounds/(\\d+)/default", wrap([this](const httplib::Request& req, httplib::Response& res) {
+        int id = std::stoi(req.matches[1]);
+        if (!db_->setDefaultBackground(id)) {
+            res.status = 404;
+            res.set_content(errorResponse("背景不存在").dump(), "application/json");
+            return;
+        }
+        res.set_content(successResponse(nullptr).dump(), "application/json");
+    }));
+
+    svr_->Delete("/api/v1/backgrounds/(\\d+)", wrap([this](const httplib::Request& req, httplib::Response& res) {
+        int id = std::stoi(req.matches[1]);
+        if (!db_->deleteBackground(id)) {
+            res.status = 404;
+            res.set_content(errorResponse("背景不存在").dump(), "application/json");
+            return;
+        }
+        res.set_content(successResponse(nullptr).dump(), "application/json");
     }));
 
     // ======================== WebSocket ========================

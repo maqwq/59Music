@@ -90,6 +90,7 @@ add_executable(59music
     src/models/SongInfo.h
     src/models/PlayerState.h
     src/models/PlayMode.h
+    src/models/BackgroundInfo.h
     ${MINIAUDIO_IMPL}
     src/server/HttpServer.h
     src/server/HttpServer.cpp
@@ -153,6 +154,7 @@ add_executable(59music_server
     src/models/SongInfo.h
     src/models/PlayerState.h
     src/models/PlayMode.h
+    src/models/BackgroundInfo.h
     ${MINIAUDIO_IMPL}
     src/server/HttpServer.h
     src/server/HttpServer.cpp
