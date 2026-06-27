@@ -127,6 +127,20 @@
           </template>
         </el-table-column>
 
+        <!-- 收藏列 -->
+        <el-table-column width="46" align="center">
+          <template #default="{ row }">
+            <el-icon
+              class="fav-heart"
+              :class="{ active: playlistStore.isFavorite(row.id) }"
+              @click="handleToggleFavorite(row)"
+            >
+              <StarFilled v-if="playlistStore.isFavorite(row.id)" />
+              <Star v-else />
+            </el-icon>
+          </template>
+        </el-table-column>
+
         <el-table-column label="歌名" min-width="200" show-overflow-tooltip>
           <template #default="{ row }">
             <span v-if="editingCell !== `title-${row.id}`" class="editable-cell" @click="startEdit(row, 'title')">
@@ -245,6 +259,8 @@ import {
   VideoPlay,
   Plus,
   Delete,
+  Star,
+  StarFilled,
 } from '@element-plus/icons-vue'
 
 const libraryStore = useLibraryStore()
@@ -408,6 +424,16 @@ async function handleDelete(song) {
     if (error !== 'cancel') {
       ElMessage.error('删除失败')
     }
+  }
+}
+
+async function handleToggleFavorite(song) {
+  try {
+    await playlistStore.toggleFavorite(song.id)
+    const isFav = playlistStore.isFavorite(song.id)
+    ElMessage.success(isFav ? `已收藏「${song.title}」` : `已取消收藏「${song.title}」`)
+  } catch {
+    ElMessage.error('操作失败')
   }
 }
 
@@ -652,6 +678,27 @@ function handlePageChange() {
 
 .delete-btn:hover {
   background: linear-gradient(135deg, #f5576c, #f093fb);
+}
+
+/* ===== 收藏爱心 ===== */
+.fav-heart {
+  font-size: 18px;
+  cursor: pointer;
+  color: #c0c4cc;
+  transition: all 0.2s;
+}
+
+.fav-heart:hover {
+  color: #f56c6c;
+  transform: scale(1.2);
+}
+
+.fav-heart.active {
+  color: #f56c6c;
+}
+
+.fav-heart.active:hover {
+  color: #f78989;
 }
 
 /* ===== 拖拽排序 ===== */
