@@ -93,7 +93,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { usePlaylistStore } from '../stores/playlist'
 import { usePlayerStore } from '../stores/player'
@@ -129,9 +129,10 @@ useSortableRows(tableRef, {
   },
 })
 
-onMounted(() => {
-  store.loadPlaylist(playlistId.value)
-})
+// 路由参数变化时重新加载（Vue 会复用组件，onMounted 不会再次触发）
+watch(playlistId, (newId) => {
+  if (newId) store.loadPlaylist(newId)
+}, { immediate: true })
 
 function startEditName() {
   editName.value = store.current?.name || ''
