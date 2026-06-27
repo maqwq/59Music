@@ -66,7 +66,7 @@ mkdir build
 cd build
 cmake --build . --target 59music_server  
 cd .\Debug\ 
-./59music_server.exe       
+./59music_server.exe
 ```
 
 ---

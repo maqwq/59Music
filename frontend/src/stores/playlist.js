@@ -20,12 +20,15 @@ export const usePlaylistStore = defineStore('playlist', () => {
   async function ensureFavoritePlaylist() {
     try {
       const allPlaylists = await playlistApi.getPlaylists()
+      playlists.value = allPlaylists
       const existing = allPlaylists.find(p => p.name === '我喜欢')
       if (existing) {
         favoritePlaylistId.value = existing.id
       } else {
         const result = await playlistApi.createPlaylist({ name: '我喜欢' })
         favoritePlaylistId.value = result.id
+        // 重新加载列表以包含新建的歌单
+        playlists.value = await playlistApi.getPlaylists()
       }
       await loadFavoriteSongs()
     } catch (e) {

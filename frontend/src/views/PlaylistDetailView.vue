@@ -30,7 +30,7 @@
           <el-button type="primary" size="large" @click="handleAddToQueue" :disabled="!store.current?.songCount">
             <el-icon><VideoPlay /></el-icon> 加入队列
           </el-button>
-          <el-button type="danger" plain size="large" @click="handleDeletePlaylist">
+          <el-button v-if="store.current?.name !== '我喜欢'" type="danger" plain size="large" @click="handleDeletePlaylist">
             删除歌单
           </el-button>
         </div>
