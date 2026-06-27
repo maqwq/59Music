@@ -24,10 +24,6 @@
           <el-icon color="#f56c6c"><Star /></el-icon>
           <span>我喜欢</span>
         </el-menu-item>
-        <el-menu-item index="/queue">
-          <el-icon><List /></el-icon>
-          <span>播放队列</span>
-        </el-menu-item>
       </el-menu>
 
       <!-- 歌单分区 -->
@@ -221,8 +217,82 @@
             class="volume-slider"
             @change="playerStore.setVolume"
           />
+
+          <el-tooltip content="播放列表" placement="top">
+            <el-button
+              circle
+              class="ctrl-btn"
+              size="small"
+              @click="queueDrawerVisible = true"
+            >
+              <el-icon size="16"><List /></el-icon>
+            </el-button>
+          </el-tooltip>
         </div>
       </el-footer>
+
+      <!-- 播放列表抽屉 -->
+      <el-drawer
+        v-model="queueDrawerVisible"
+        title="播放列表"
+        direction="rtl"
+        size="420px"
+        :modal="true"
+        :append-to-body="true"
+        class="queue-drawer"
+      >
+        <template #header>
+          <div class="drawer-header">
+            <span class="drawer-title">播放列表</span>
+            <span class="drawer-subtitle">{{ expandedCount }} 首歌 · {{ playerStore.queue.length }} 项</span>
+          </div>
+        </template>
+        <template #header-extra>
+          <el-button
+            type="danger"
+            plain
+            size="small"
+            @click="handleClearQueue"
+            :disabled="playerStore.queue.length === 0"
+          >
+            清空
+          </el-button>
+        </template>
+
+        <div class="drawer-queue-list" v-if="playerStore.queue.length > 0">
+          <div
+            v-for="(item, index) in playerStore.queue"
+            :key="item.type === 'song' ? `song-${item.songId}` : `playlist-${item.playlistId}`"
+            class="drawer-queue-item"
+            :class="{ active: index === playerStore.currentIndex }"
+            @dblclick="item.type === 'song' && item.song && playerStore.playSong(item.song)"
+          >
+            <!-- 歌单类型 -->
+            <template v-if="item.type === 'playlist'">
+              <span class="drawer-item-icon">🎵</span>
+              <div class="drawer-item-info">
+                <span class="drawer-item-title">{{ item.playlistName }}</span>
+                <span class="drawer-item-artist">{{ item.songs?.length || 0 }} 首</span>
+              </div>
+              <span class="drawer-item-duration">{{ formatTime(totalDuration(item.songs)) }}</span>
+            </template>
+            <!-- 单曲类型 -->
+            <template v-else>
+              <span class="drawer-item-index">
+                <el-icon v-if="index === playerStore.currentIndex" color="#409eff" size="14"><VideoPlay /></el-icon>
+                <span v-else>{{ index + 1 }}</span>
+              </span>
+              <div class="drawer-item-info">
+                <span class="drawer-item-title">{{ item.song?.title || '(已删除)' }}</span>
+                <span class="drawer-item-artist">{{ item.song?.artist || '' }}</span>
+              </div>
+              <span class="drawer-item-duration">{{ formatTime(item.song?.duration) }}</span>
+              <el-icon class="drawer-item-remove" @click.stop="handleDrawerRemove(index)"><Delete /></el-icon>
+            </template>
+          </div>
+        </div>
+        <el-empty v-else description="队列是空的" :image-size="60" />
+      </el-drawer>
     </el-container>
   </el-container>
 </template>
@@ -234,6 +304,8 @@ import { usePlayerStore } from './stores/player'
 import { usePlaylistStore } from './stores/playlist'
 import { useWebSocket } from './composables/useWebSocket'
 import { useKeyboard } from './composables/useKeyboard'
+import { removeFromQueue, clearQueue } from './api/queue'
+import { formatTime } from './utils/format'
 import {
   Headset,
   List,
@@ -261,6 +333,47 @@ const route = useRoute()
 const router = useRouter()
 const playerStore = usePlayerStore()
 const playlistStore = usePlaylistStore()
+
+// ===== 播放列表抽屉 =====
+const queueDrawerVisible = ref(false)
+
+const expandedCount = computed(() => {
+  let count = 0
+  for (const item of playerStore.queue) {
+    if (item.type === 'song') count++
+    else if (item.type === 'playlist') count += item.songs?.length || 0
+  }
+  return count
+})
+
+function totalDuration(songs) {
+  if (!songs) return 0
+  return songs.reduce((sum, s) => sum + (s.duration || 0), 0)
+}
+
+async function handleDrawerRemove(index) {
+  try {
+    await removeFromQueue(index)
+    await playerStore.refreshQueue()
+  } catch {
+    ElMessage.error('移除失败')
+  }
+}
+
+async function handleClearQueue() {
+  try {
+    await ElMessageBox.confirm('确定清空整个播放队列吗？', '确认', { type: 'warning' })
+    await clearQueue()
+    playerStore.queue = []
+    playerStore.currentSong = null
+    playerStore.currentPosition = 0
+    playerStore.duration = 0
+    playerStore.isPlaying = false
+    playerStore.currentIndex = -1
+  } catch (error) {
+    if (error !== 'cancel') ElMessage.error('清空失败')
+  }
+}
 
 // ===== 歌单侧边栏 =====
 const playlistExpanded = ref(true)
@@ -876,5 +989,127 @@ html, body {
 
 .volume-slider {
   width: 100px;
+}
+
+/* ===== 播放列表抽屉 ===== */
+:deep(.queue-drawer .el-drawer__header) {
+  margin-bottom: 0;
+  padding: 16px 20px;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.drawer-header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.drawer-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #303133;
+}
+
+.drawer-subtitle {
+  font-size: 12px;
+  color: #909399;
+}
+
+:deep(.queue-drawer .el-drawer__body) {
+  padding: 0;
+  overflow: hidden;
+}
+
+.drawer-queue-list {
+  height: 100%;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+.drawer-queue-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 20px;
+  cursor: pointer;
+  transition: background-color 0.15s;
+  user-select: none;
+}
+
+.drawer-queue-item:hover {
+  background-color: #f0f2ff;
+}
+
+.drawer-queue-item.active {
+  background-color: #ecf5ff;
+}
+
+.drawer-queue-item.active .drawer-item-title {
+  color: #409eff;
+  font-weight: 600;
+}
+
+.drawer-item-index {
+  width: 24px;
+  text-align: center;
+  font-size: 12px;
+  color: #909399;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.drawer-item-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.drawer-item-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.drawer-item-title {
+  font-size: 13px;
+  color: #303133;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.drawer-item-artist {
+  font-size: 11px;
+  color: #909399;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.drawer-item-duration {
+  font-size: 12px;
+  color: #909399;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.drawer-item-remove {
+  font-size: 14px;
+  color: #c0c4cc;
+  cursor: pointer;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: all 0.15s;
+}
+
+.drawer-queue-item:hover .drawer-item-remove {
+  opacity: 1;
+}
+
+.drawer-item-remove:hover {
+  color: #f56c6c;
 }
 </style>
