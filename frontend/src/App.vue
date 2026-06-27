@@ -259,14 +259,36 @@
           </el-button>
         </template>
 
+        <!-- 批量操作栏 -->
+        <div v-if="drawerSelected.size > 0" class="drawer-batch-bar">
+          <div class="drawer-batch-left">
+            <el-checkbox
+              :model-value="drawerSelected.size === playerStore.queue.length"
+              :indeterminate="drawerSelected.size > 0 && drawerSelected.size < playerStore.queue.length"
+              @change="handleDrawerSelectAll"
+            />
+            <span class="drawer-batch-info">已选 {{ drawerSelected.size }} 项</span>
+          </div>
+          <div class="drawer-batch-actions">
+            <el-button size="small" type="danger" plain @click="handleDrawerRemoveSelected">删除</el-button>
+            <el-button size="small" @click="drawerSelected.clear()">取消</el-button>
+          </div>
+        </div>
+
         <div ref="drawerListRef" class="drawer-queue-list" v-if="playerStore.queue.length > 0">
           <div
             v-for="(item, index) in playerStore.queue"
             :key="item.type === 'song' ? `song-${item.songId}` : `playlist-${item.playlistId}`"
             class="drawer-queue-item"
-            :class="{ active: index === playerStore.currentIndex }"
+            :class="{ active: index === playerStore.currentIndex, selected: drawerSelected.has(index) }"
             @dblclick="item.type === 'song' && item.song && playerStore.playSong(item.song)"
           >
+            <el-checkbox
+              :model-value="drawerSelected.has(index)"
+              @click.stop
+              @change="handleDrawerToggleSelect(index)"
+              class="drawer-item-checkbox"
+            />
             <!-- 歌单类型 -->
             <template v-if="item.type === 'playlist'">
               <span class="drawer-item-icon">🎵</span>
@@ -347,6 +369,7 @@ const playlistStore = usePlaylistStore()
 // ===== 播放列表抽屉 =====
 const queueDrawerVisible = ref(false)
 const drawerListRef = ref(null)
+const drawerSelected = ref(new Set())
 let drawerSortableInstance = null
 
 function initDrawerSortable() {
@@ -377,6 +400,7 @@ watch(queueDrawerVisible, (visible) => {
   } else {
     drawerSortableInstance?.destroy()
     drawerSortableInstance = null
+    drawerSelected.value = new Set()
   }
 })
 
@@ -410,6 +434,39 @@ async function handleDrawerToggleFavorite(song) {
     ElMessage.success(isFav ? `已收藏「${song.title}」` : `已取消收藏「${song.title}」`)
   } catch {
     ElMessage.error('操作失败')
+  }
+}
+
+function handleDrawerToggleSelect(index) {
+  const newSet = new Set(drawerSelected.value)
+  if (newSet.has(index)) {
+    newSet.delete(index)
+  } else {
+    newSet.add(index)
+  }
+  drawerSelected.value = newSet
+}
+
+function handleDrawerSelectAll(checked) {
+  if (checked) {
+    drawerSelected.value = new Set(playerStore.queue.map((_, i) => i))
+  } else {
+    drawerSelected.value = new Set()
+  }
+}
+
+async function handleDrawerRemoveSelected() {
+  const indices = Array.from(drawerSelected.value).sort((a, b) => b - a)
+  try {
+    for (const idx of indices) {
+      await removeFromQueue(idx)
+    }
+    drawerSelected.value = new Set()
+    await playerStore.refreshQueue()
+    ElMessage.success(`已删除 ${indices.length} 项`)
+  } catch {
+    ElMessage.error('批量删除失败')
+    await playerStore.refreshQueue()
   }
 }
 
@@ -1073,6 +1130,33 @@ html, body {
   overflow: hidden;
 }
 
+/* 批量操作栏 */
+.drawer-batch-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #fef0f0, #fde2e2);
+  border-bottom: 1px solid #fde2e2;
+}
+
+.drawer-batch-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.drawer-batch-info {
+  font-size: 12px;
+  color: #f56c6c;
+  font-weight: 500;
+}
+
+.drawer-batch-actions {
+  display: flex;
+  gap: 6px;
+}
+
 .drawer-queue-list {
   height: 100%;
   overflow-y: auto;
@@ -1100,6 +1184,15 @@ html, body {
 .drawer-queue-item.active .drawer-item-title {
   color: #409eff;
   font-weight: 600;
+}
+
+.drawer-queue-item.selected {
+  background-color: #fdf6ec;
+}
+
+.drawer-item-checkbox {
+  flex-shrink: 0;
+  margin-right: 2px;
 }
 
 .drawer-item-index {
