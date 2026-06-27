@@ -121,6 +121,15 @@
               {{ playerStore.hasCurrentSong ? playerStore.currentSong.artist : '选择一首歌曲开始播放' }}
             </div>
           </div>
+          <el-icon
+            v-if="playerStore.hasCurrentSong"
+            class="bar-fav-heart"
+            :class="{ active: playlistStore.isFavorite(playerStore.currentSong.id) }"
+            @click="handleBarToggleFavorite"
+          >
+            <StarFilled v-if="playlistStore.isFavorite(playerStore.currentSong.id)" />
+            <Star v-else />
+          </el-icon>
         </div>
 
         <!-- 中间：控制按钮 + 进度 -->
@@ -230,6 +239,7 @@ import {
   List,
   Menu,
   Star,
+  StarFilled,
   ArrowLeft,
   ArrowRight,
   ArrowDown,
@@ -372,6 +382,18 @@ function cycleMode() {
   const currentIndex = modeOrder.indexOf(playerStore.mode)
   const nextIndex = (currentIndex + 1) % modeOrder.length
   playerStore.setMode(modeOrder[nextIndex])
+}
+
+// ===== 播放栏收藏 =====
+async function handleBarToggleFavorite() {
+  if (!playerStore.hasCurrentSong) return
+  try {
+    await playlistStore.toggleFavorite(playerStore.currentSong.id)
+    const isFav = playlistStore.isFavorite(playerStore.currentSong.id)
+    ElMessage.success(isFav ? `已收藏「${playerStore.currentSong.title}」` : `已取消收藏`)
+  } catch {
+    ElMessage.error('操作失败')
+  }
 }
 
 // ===== WebSocket 连接（进度推送 + 状态同步）=====
@@ -759,6 +781,28 @@ html, body {
   overflow: hidden;
   text-overflow: ellipsis;
   margin-top: 2px;
+}
+
+.bar-fav-heart {
+  font-size: 20px;
+  cursor: pointer;
+  color: #c0c4cc;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+
+.bar-fav-heart:hover {
+  color: #f56c6c;
+  transform: scale(1.15);
+}
+
+.bar-fav-heart.active {
+  color: #f56c6c;
+}
+
+.bar-fav-heart.active:hover {
+  color: #f78989;
 }
 
 /* 中间控制区 */
