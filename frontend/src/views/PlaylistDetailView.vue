@@ -63,9 +63,11 @@
             <span class="duration-cell">{{ formatTime(row.duration) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="100" fixed="right" align="center">
+        <el-table-column label="操作" width="120" fixed="right" align="center">
           <template #default="{ row }">
-            <el-button type="danger" link size="small" @click="handleRemove(row)">移除</el-button>
+            <el-button class="action-btn delete-btn" type="danger" size="small" @click="handleRemove(row)">
+              <el-icon><Delete /></el-icon> 移除
+            </el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -81,7 +83,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { usePlaylistStore } from '../stores/playlist'
 import { usePlayerStore } from '../stores/player'
 import { addPlaylistToQueue } from '../api/queue'
-import { ArrowLeft, VideoPlay } from '@element-plus/icons-vue'
+import { ArrowLeft, VideoPlay, Delete } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useSortableRows } from '../composables/useSortableRows'
 import { formatTime } from '../utils/format'
@@ -271,6 +273,33 @@ function handlePlay(song) {
 .duration-cell {
   color: #909399;
   font-size: 13px;
+}
+
+/* ===== 操作按钮 ===== */
+.action-btn {
+  border-radius: 6px;
+  font-weight: 500;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  border: none;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.action-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.action-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+
+.delete-btn {
+  background: linear-gradient(135deg, #f093fb, #f5576c);
+}
+
+.delete-btn:hover {
+  background: linear-gradient(135deg, #f5576c, #f093fb);
 }
 
 /* ===== 拖拽排序 ===== */

@@ -97,19 +97,19 @@
         </el-table-column>
 
         <!-- 操作 -->
-        <el-table-column width="140" fixed="right" align="center">
+        <el-table-column width="200" fixed="right" align="center">
           <template #default="{ row }">
             <el-button
               v-if="row.type === 'song'"
-              link
+              class="action-btn play-btn"
               type="primary"
               size="small"
               @click="handlePlaySong(row.song)"
             >
               <el-icon><VideoPlay /></el-icon> 播放
             </el-button>
-            <el-button link type="danger" size="small" @click="handleRemove(row._index)">
-              删除
+            <el-button class="action-btn delete-btn" type="danger" size="small" @click="handleRemove(row._index)">
+              <el-icon><Delete /></el-icon> 删除
             </el-button>
           </template>
         </el-table-column>
@@ -148,7 +148,7 @@ import { removeFromQueue, clearQueue, reorderQueue } from '../api/queue'
 import { useSelection } from '../composables/useSelection'
 import { useSortableRows } from '../composables/useSortableRows'
 import { formatTime } from '../utils/format'
-import { VideoPlay, Check } from '@element-plus/icons-vue'
+import { VideoPlay, Check, Delete } from '@element-plus/icons-vue'
 
 const playerStore = usePlayerStore()
 const queueTable = ref(null)
@@ -405,6 +405,41 @@ function totalDuration(songs) {
   font-size: 13px;
   width: 48px;
   text-align: right;
+}
+
+/* ===== 操作按钮 ===== */
+.action-btn {
+  border-radius: 6px;
+  font-weight: 500;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  border: none;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.action-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.action-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+
+.play-btn {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+}
+
+.play-btn:hover {
+  background: linear-gradient(135deg, #764ba2, #667eea);
+}
+
+.delete-btn {
+  background: linear-gradient(135deg, #f093fb, #f5576c);
+}
+
+.delete-btn:hover {
+  background: linear-gradient(135deg, #f5576c, #f093fb);
 }
 
 /* ===== 行样式 ===== */

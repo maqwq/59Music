@@ -158,6 +158,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { usePlayerStore } from './stores/player'
+import { usePlaylistStore } from './stores/playlist'
 import { useWebSocket } from './composables/useWebSocket'
 import { useKeyboard } from './composables/useKeyboard'
 import {
@@ -177,6 +178,7 @@ import {
 } from '@element-plus/icons-vue'
 
 const playerStore = usePlayerStore()
+const playlistStore = usePlaylistStore()
 
 // ===== 键盘快捷键 =====
 useKeyboard()
@@ -227,6 +229,7 @@ const { connected } = useWebSocket()
 onMounted(async () => {
   await playerStore.loadState()
   await playerStore.refreshQueue()
+  await playlistStore.ensureFavoritePlaylist()
 
   // 兜底：如果 WebSocket 连不上，用本地 tick 模拟进度
   let tickTimer = null

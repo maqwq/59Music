@@ -1,4 +1,5 @@
 # 59Music
+
 一个基于 C++ 与 Vue 开发的本地音乐播放器，支持本地音乐播放、音乐列表管理以及随机播放功能。
 
 ---
@@ -63,8 +64,9 @@ npm run dev
 cd backend
 mkdir build
 cd build
-cmake ..
-make
+cmake --build . --target 59music_server  
+cd .\Debug\ 
+./59music_server.exe       
 ```
 
 ---
