@@ -320,11 +320,11 @@ function handlePlay(song) {
 }
 
 .delete-btn {
-  background: linear-gradient(135deg, #f093fb, #f5576c);
+  background: linear-gradient(135deg, #f07070, #b71c1c);
 }
 
 .delete-btn:hover {
-  background: linear-gradient(135deg, #f5576c, #f093fb);
+  background: linear-gradient(135deg, #b71c1c, #f07070);
 }
 
 /* ===== 收藏爱心 ===== */

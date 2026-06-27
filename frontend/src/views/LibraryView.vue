@@ -655,28 +655,28 @@ function handlePageChange() {
 }
 
 .play-btn {
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: linear-gradient(135deg, #8e99d4, #4a5a9a);
 }
 
 .play-btn:hover {
-  background: linear-gradient(135deg, #764ba2, #667eea);
+  background: linear-gradient(135deg, #4a5a9a, #8e99d4);
 }
 
 .queue-btn {
-  background: linear-gradient(135deg, #43e97b, #38f9d7);
+  background: linear-gradient(135deg, #81c784, #2e7d32);
   color: #fff;
 }
 
 .queue-btn:hover {
-  background: linear-gradient(135deg, #38f9d7, #43e97b);
+  background: linear-gradient(135deg, #2e7d32, #81c784);
 }
 
 .delete-btn {
-  background: linear-gradient(135deg, #f093fb, #f5576c);
+  background: linear-gradient(135deg, #f07070, #b71c1c);
 }
 
 .delete-btn:hover {
-  background: linear-gradient(135deg, #f5576c, #f093fb);
+  background: linear-gradient(135deg, #b71c1c, #f07070);
 }
 
 /* ===== 收藏爱心 ===== */
