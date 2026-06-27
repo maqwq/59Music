@@ -43,16 +43,20 @@
     <!-- 操作栏 -->
     <div class="toolbar">
       <div class="toolbar-left">
-        <input
-          ref="folderInput"
-          type="file"
-          webkitdirectory
-          style="display: none"
-          @change="handleFolderSelect"
-        />
-        <el-button type="primary" :loading="libraryStore.scanning" @click="triggerFolderSelect">
+        <el-input
+          v-model="scanPath"
+          placeholder="输入文件夹路径，按回车扫描"
+          clearable
+          class="scan-input"
+          @keyup.enter="handleScan"
+        >
+          <template #prefix>
+            <el-icon><FolderOpened /></el-icon>
+          </template>
+        </el-input>
+        <el-button type="primary" :loading="libraryStore.scanning" @click="handleScan">
           <el-icon><FolderOpened /></el-icon>
-          选择文件夹
+          从文件夹添加歌曲
         </el-button>
       </div>
       <div class="toolbar-right">
@@ -264,7 +268,7 @@ const playerStore = usePlayerStore()
 const playlistStore = usePlaylistStore()
 
 const libraryTable = ref(null)
-const folderInput = ref(null)
+const scanPath = ref('')
 const searchKeyword = ref('')
 
 const selection = useSelection(computed(() => libraryStore.songs), { key: 'id' })
@@ -378,31 +382,18 @@ function handleReset() {
   libraryStore.resetSearch()
 }
 
-function triggerFolderSelect() {
-  folderInput.value?.click()
-}
-
-async function handleFolderSelect(event) {
-  const files = event.target.files
-  if (!files || files.length === 0) return
-
-  // 从第一个文件的路径中提取文件夹路径
-  const firstFile = files[0]
-  const folderPath = firstFile.webkitRelativePath?.split('/')[0]
-  if (!folderPath) {
-    ElMessage.warning('无法获取文件夹路径')
+async function handleScan() {
+  const folder = scanPath.value.trim()
+  if (!folder) {
+    ElMessage.warning('请输入文件夹路径')
     return
   }
-
   try {
-    const result = await libraryStore.scanFolder(folderPath)
+    const result = await libraryStore.scanFolder(folder)
     ElMessage.success(`扫描完成，新增 ${result.addedCount} 首歌曲`)
   } catch {
     ElMessage.error('扫描失败')
   }
-
-  // 清空 input 以便可以重复选择同一文件夹
-  event.target.value = ''
 }
 
 function handlePlay(song) {
@@ -551,6 +542,10 @@ function handlePageChange() {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.scan-input {
+  width: 300px;
 }
 
 .search-input {
