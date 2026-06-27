@@ -65,6 +65,21 @@
           </template>
         </el-table-column>
 
+        <!-- 收藏列 -->
+        <el-table-column width="46" align="center">
+          <template #default="{ row }">
+            <el-icon
+              v-if="row.type === 'song' && row.song"
+              class="fav-heart"
+              :class="{ active: playlistStore.isFavorite(row.song.id) }"
+              @click="handleToggleFavorite(row.song)"
+            >
+              <StarFilled v-if="playlistStore.isFavorite(row.song.id)" />
+              <Star v-else />
+            </el-icon>
+          </template>
+        </el-table-column>
+
         <!-- 信息列 -->
         <el-table-column label="歌曲 / 歌单" min-width="300">
           <template #default="{ row }">
@@ -144,13 +159,15 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { usePlayerStore } from '../stores/player'
+import { usePlaylistStore } from '../stores/playlist'
 import { removeFromQueue, clearQueue, reorderQueue } from '../api/queue'
 import { useSelection } from '../composables/useSelection'
 import { useSortableRows } from '../composables/useSortableRows'
 import { formatTime } from '../utils/format'
-import { VideoPlay, Check, Delete } from '@element-plus/icons-vue'
+import { VideoPlay, Check, Delete, Star, StarFilled } from '@element-plus/icons-vue'
 
 const playerStore = usePlayerStore()
+const playlistStore = usePlaylistStore()
 const queueTable = ref(null)
 
 // 为每项生成稳定 key + 保留原始索引（不使用 Date.now()，避免不必要的 DOM 重建）
@@ -209,6 +226,16 @@ async function handleRemove(index) {
     await playerStore.refreshQueue()
   } catch {
     ElMessage.error('移除失败')
+  }
+}
+
+async function handleToggleFavorite(song) {
+  try {
+    await playlistStore.toggleFavorite(song.id)
+    const isFav = playlistStore.isFavorite(song.id)
+    ElMessage.success(isFav ? `已收藏「${song.title}」` : `已取消收藏「${song.title}」`)
+  } catch {
+    ElMessage.error('操作失败')
   }
 }
 
@@ -440,6 +467,27 @@ function totalDuration(songs) {
 
 .delete-btn:hover {
   background: linear-gradient(135deg, #f5576c, #f093fb);
+}
+
+/* ===== 收藏爱心 ===== */
+.fav-heart {
+  font-size: 18px;
+  cursor: pointer;
+  color: #c0c4cc;
+  transition: all 0.2s;
+}
+
+.fav-heart:hover {
+  color: #f56c6c;
+  transform: scale(1.2);
+}
+
+.fav-heart.active {
+  color: #f56c6c;
+}
+
+.fav-heart.active:hover {
+  color: #f78989;
 }
 
 /* ===== 行样式 ===== */
