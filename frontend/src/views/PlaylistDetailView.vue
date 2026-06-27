@@ -52,6 +52,21 @@
             <span class="track-num">{{ $index + 1 }}</span>
           </template>
         </el-table-column>
+
+        <!-- 收藏列 -->
+        <el-table-column width="46" align="center">
+          <template #default="{ row }">
+            <el-icon
+              class="fav-heart"
+              :class="{ active: playlistStore.isFavorite(row.id) }"
+              @click="handleToggleFavorite(row)"
+            >
+              <StarFilled v-if="playlistStore.isFavorite(row.id)" />
+              <Star v-else />
+            </el-icon>
+          </template>
+        </el-table-column>
+
         <el-table-column prop="title" label="歌名" min-width="200" show-overflow-tooltip />
         <el-table-column prop="artist" label="歌手" min-width="150" show-overflow-tooltip>
           <template #default="{ row }">
@@ -83,7 +98,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { usePlaylistStore } from '../stores/playlist'
 import { usePlayerStore } from '../stores/player'
 import { addPlaylistToQueue } from '../api/queue'
-import { ArrowLeft, VideoPlay, Delete } from '@element-plus/icons-vue'
+import { ArrowLeft, VideoPlay, Delete, Star, StarFilled } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useSortableRows } from '../composables/useSortableRows'
 import { formatTime } from '../utils/format'
@@ -135,6 +150,16 @@ async function saveName() {
 async function handleRemove(song) {
   await store.removeSong(playlistId.value, song.id)
   ElMessage.success('已移除')
+}
+
+async function handleToggleFavorite(song) {
+  try {
+    await store.toggleFavorite(song.id)
+    const isFav = store.isFavorite(song.id)
+    ElMessage.success(isFav ? `已收藏「${song.title}」` : `已取消收藏「${song.title}」`)
+  } catch {
+    ElMessage.error('操作失败')
+  }
 }
 
 async function handleAddToQueue() {
@@ -300,6 +325,27 @@ function handlePlay(song) {
 
 .delete-btn:hover {
   background: linear-gradient(135deg, #f5576c, #f093fb);
+}
+
+/* ===== 收藏爱心 ===== */
+.fav-heart {
+  font-size: 18px;
+  cursor: pointer;
+  color: #c0c4cc;
+  transition: all 0.2s;
+}
+
+.fav-heart:hover {
+  color: #f56c6c;
+  transform: scale(1.2);
+}
+
+.fav-heart.active {
+  color: #f56c6c;
+}
+
+.fav-heart.active:hover {
+  color: #f78989;
 }
 
 /* ===== 拖拽排序 ===== */
