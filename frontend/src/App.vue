@@ -259,7 +259,7 @@
           </el-button>
         </template>
 
-        <div class="drawer-queue-list" v-if="playerStore.queue.length > 0">
+        <div ref="drawerListRef" class="drawer-queue-list" v-if="playerStore.queue.length > 0">
           <div
             v-for="(item, index) in playerStore.queue"
             :key="item.type === 'song' ? `song-${item.songId}` : `playlist-${item.playlistId}`"
@@ -286,6 +286,15 @@
                 <span class="drawer-item-title">{{ item.song?.title || '(已删除)' }}</span>
                 <span class="drawer-item-artist">{{ item.song?.artist || '' }}</span>
               </div>
+              <el-icon
+                v-if="item.song"
+                class="drawer-item-fav"
+                :class="{ active: playlistStore.isFavorite(item.song.id) }"
+                @click.stop="handleDrawerToggleFavorite(item.song)"
+              >
+                <StarFilled v-if="playlistStore.isFavorite(item.song.id)" />
+                <Star v-else />
+              </el-icon>
               <span class="drawer-item-duration">{{ formatTime(item.song?.duration) }}</span>
               <el-icon class="drawer-item-remove" @click.stop="handleDrawerRemove(index)"><Delete /></el-icon>
             </template>
@@ -298,13 +307,14 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch, nextTick } from 'vue'
+import Sortable from 'sortablejs'
 import { useRoute, useRouter } from 'vue-router'
 import { usePlayerStore } from './stores/player'
 import { usePlaylistStore } from './stores/playlist'
 import { useWebSocket } from './composables/useWebSocket'
 import { useKeyboard } from './composables/useKeyboard'
-import { removeFromQueue, clearQueue } from './api/queue'
+import { removeFromQueue, clearQueue, reorderQueue } from './api/queue'
 import { formatTime } from './utils/format'
 import {
   Headset,
@@ -336,6 +346,39 @@ const playlistStore = usePlaylistStore()
 
 // ===== 播放列表抽屉 =====
 const queueDrawerVisible = ref(false)
+const drawerListRef = ref(null)
+let drawerSortableInstance = null
+
+function initDrawerSortable() {
+  const el = drawerListRef.value
+  if (!el) return
+  drawerSortableInstance?.destroy()
+  drawerSortableInstance = Sortable.create(el, {
+    animation: 150,
+    ghostClass: 'sortable-ghost',
+    chosenClass: 'sortable-chosen',
+    onEnd: async (event) => {
+      const { oldIndex, newIndex } = event
+      if (oldIndex === newIndex || newIndex == null) return
+      try {
+        await reorderQueue(oldIndex, newIndex)
+        await playerStore.refreshQueue()
+      } catch {
+        ElMessage.error('排序失败')
+        await playerStore.refreshQueue()
+      }
+    },
+  })
+}
+
+watch(queueDrawerVisible, (visible) => {
+  if (visible) {
+    nextTick(initDrawerSortable)
+  } else {
+    drawerSortableInstance?.destroy()
+    drawerSortableInstance = null
+  }
+})
 
 const expandedCount = computed(() => {
   let count = 0
@@ -357,6 +400,16 @@ async function handleDrawerRemove(index) {
     await playerStore.refreshQueue()
   } catch {
     ElMessage.error('移除失败')
+  }
+}
+
+async function handleDrawerToggleFavorite(song) {
+  try {
+    await playlistStore.toggleFavorite(song.id)
+    const isFav = playlistStore.isFavorite(song.id)
+    ElMessage.success(isFav ? `已收藏「${song.title}」` : `已取消收藏「${song.title}」`)
+  } catch {
+    ElMessage.error('操作失败')
   }
 }
 
@@ -1111,5 +1164,36 @@ html, body {
 
 .drawer-item-remove:hover {
   color: #f56c6c;
+}
+
+.drawer-item-fav {
+  font-size: 14px;
+  cursor: pointer;
+  color: #c0c4cc;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+
+.drawer-item-fav:hover {
+  color: #f56c6c;
+  transform: scale(1.2);
+}
+
+.drawer-item-fav.active {
+  color: #f56c6c;
+}
+
+.drawer-item-fav.active:hover {
+  color: #f78989;
+}
+
+/* 拖拽占位样式 */
+:deep(.sortable-ghost) {
+  opacity: 0.4;
+  background-color: #f5f7fa !important;
+}
+
+:deep(.sortable-chosen) {
+  background-color: #ecf5ff !important;
 }
 </style>
