@@ -30,8 +30,8 @@
     <div class="table-wrapper" v-if="playerStore.queue.length > 0">
       <el-table
         ref="queueTable"
-        :data="queueWithIndex"
-        row-key="key"
+        :data="queueWithKey"
+        row-key="_key"
         :row-class-name="getRowClass"
         class="queue-table"
         @row-dblclick="handleRowDblClick"
@@ -123,7 +123,7 @@
             >
               <el-icon><VideoPlay /></el-icon> 播放
             </el-button>
-            <el-button class="action-btn delete-btn" type="danger" size="small" @click="handleRemove(row._index)">
+            <el-button class="action-btn delete-btn" type="danger" size="small" @click="handleRemove($index)">
               <el-icon><Delete /></el-icon> 删除
             </el-button>
           </template>
@@ -170,12 +170,15 @@ const playerStore = usePlayerStore()
 const playlistStore = usePlaylistStore()
 const queueTable = ref(null)
 
-// 为每项生成稳定 key + 保留原始索引（不使用 Date.now()，避免不必要的 DOM 重建）
-const queueWithIndex = computed(() =>
-  playerStore.queue.map((item, i) => ({ ...item, key: `${item.type}-${i}`, _index: i }))
+// 为每项生成稳定 key（基于类型+ID，不使用位置索引，避免排序后 key 变化导致 DOM 重建）
+const queueWithKey = computed(() =>
+  playerStore.queue.map((item) => ({
+    ...item,
+    _key: item.type === 'song' ? `song-${item.songId}` : `playlist-${item.playlistId}`,
+  }))
 )
 
-const selection = useSelection(computed(() => queueWithIndex.value), { key: 'key' })
+const selection = useSelection(computed(() => queueWithKey.value), { key: '_key' })
 
 const expandedCount = computed(() => {
   let count = 0
@@ -186,9 +189,9 @@ const expandedCount = computed(() => {
   return count
 })
 
-// 拖拽排序
+// 拖拽排序 — 使用 playerStore.queue 直接引用，避免 queueWithKey 每次创建新对象触发 sortable 重建
 useSortableRows(queueTable, {
-  data: computed(() => queueWithIndex.value),
+  data: computed(() => playerStore.queue),
   onSort: async (oldIndex, newIndex) => {
     try {
       await reorderQueue(oldIndex, newIndex)
@@ -241,7 +244,7 @@ async function handleToggleFavorite(song) {
 
 async function handleRemoveSelected() {
   const indices = selection.selectedItems
-    .map(item => queueWithIndex.value.findIndex(q => q.key === item.key))
+    .map(item => queueWithKey.value.findIndex(q => q._key === item._key))
     .filter(i => i >= 0)
     .sort((a, b) => b - a)
 
