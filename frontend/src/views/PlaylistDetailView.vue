@@ -58,10 +58,10 @@
           <template #default="{ row }">
             <el-icon
               class="fav-heart"
-              :class="{ active: playlistStore.isFavorite(row.id) }"
+              :class="{ active: store.isFavorite(row.id) }"
               @click="handleToggleFavorite(row)"
             >
-              <StarFilled v-if="playlistStore.isFavorite(row.id)" />
+              <StarFilled v-if="store.isFavorite(row.id)" />
               <Star v-else />
             </el-icon>
           </template>
