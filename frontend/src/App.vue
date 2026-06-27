@@ -263,7 +263,7 @@ const playerStore = usePlayerStore()
 const playlistStore = usePlaylistStore()
 
 // ===== 歌单侧边栏 =====
-const playlistExpanded = ref(false)
+const playlistExpanded = ref(true)
 const contextMenu = ref({ visible: false, x: 0, y: 0, playlist: null })
 
 const playlistsExceptFavorite = computed(() =>
