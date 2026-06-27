@@ -128,26 +128,6 @@
             </el-button>
           </template>
         </el-table-column>
-
-        <!-- 歌单展开 -->
-        <el-table-column type="expand">
-          <template #default="{ row }">
-            <div v-if="row.type === 'playlist'" class="playlist-songs">
-              <div
-                v-for="(song, si) in row.songs"
-                :key="si"
-                class="playlist-song-item"
-                @dblclick="handlePlaySong(song)"
-              >
-                <span class="song-idx">{{ si + 1 }}.</span>
-                <span class="ps-title">{{ song.title }}</span>
-                <span class="ps-artist">{{ song.artist }}</span>
-                <span class="ps-duration">{{ formatTime(song.duration) }}</span>
-              </div>
-              <el-empty v-if="!row.songs || row.songs.length === 0" description="歌单为空" :image-size="40" />
-            </div>
-          </template>
-        </el-table-column>
       </el-table>
     </div>
 
@@ -391,50 +371,6 @@ function totalDuration(songs) {
 .song-artist {
   color: #909399;
   font-size: 13px;
-}
-
-/* ===== 歌单展开 ===== */
-.playlist-songs {
-  padding: 8px 0;
-}
-
-.playlist-song-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 24px;
-  cursor: pointer;
-  border-radius: 4px;
-  transition: background-color 0.15s;
-}
-
-.playlist-song-item:hover {
-  background: #f0f2ff;
-}
-
-.song-idx {
-  color: #909399;
-  width: 28px;
-  text-align: right;
-  font-size: 13px;
-}
-
-.ps-title {
-  flex: 1;
-  font-size: 14px;
-}
-
-.ps-artist {
-  color: #909399;
-  font-size: 13px;
-  width: 120px;
-}
-
-.ps-duration {
-  color: #909399;
-  font-size: 13px;
-  width: 48px;
-  text-align: right;
 }
 
 /* ===== 操作按钮 ===== */
