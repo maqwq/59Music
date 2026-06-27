@@ -135,7 +135,6 @@ async function handleGenerate() {
 <style scoped>
 .playlist-list-view {
   padding: 24px;
-  max-width: 1200px;
 }
 
 /* ===== 页面标题 ===== */

@@ -478,7 +478,6 @@ function handlePageChange() {
 <style scoped>
 .library-view {
   padding: 24px;
-  max-width: 1400px;
 }
 
 /* ===== 统计卡片 ===== */
