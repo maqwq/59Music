@@ -996,10 +996,10 @@ void HttpServer::registerAllRoutes() {
         ofs.write(file.content.data(), file.content.size());
         ofs.close();
 
-        // 返回文件路径
+        // 返回文件路径（只返回文件名，不返回完整路径）
         Json data;
         data["fileName"] = newFileName;
-        data["filePath"] = savePath.string();
+        data["filePath"] = newFileName;  // 只保存文件名
         data["url"] = "/backgrounds/" + newFileName;
         res.set_content(successResponse(data).dump(), "application/json");
     });

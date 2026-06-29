@@ -95,13 +95,8 @@ function goToBackgroundManage() {
 }
 
 function handleToggleCustomBackground(enabled) {
-  if (enabled) {
-    backgroundStore.applyBackground()
-    ElMessage.success('已开启自定义背景')
-  } else {
-    backgroundStore.clearBackground()
-    ElMessage.success('已关闭自定义背景')
-  }
+  backgroundStore.toggleCustomBackground(enabled)
+  ElMessage.success(enabled ? '已开启自定义背景' : '已关闭自定义背景')
 }
 </script>
 
