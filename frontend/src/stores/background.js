@@ -65,8 +65,9 @@ export const useBackgroundStore = defineStore('background', () => {
   async function fetchBackgrounds() {
     try {
       const res = await getAllBackgrounds()
-      if (res.data) {
-        backgrounds.value = res.data.map((bg) => ({
+      // 响应拦截器已自动返回 body.data，所以 res 就是背景数组
+      if (res && Array.isArray(res)) {
+        backgrounds.value = res.map((bg) => ({
           ...bg,
           displayMode: bg.displayMode || 'cover',
           sidebarOpacity: bg.sidebarOpacity ?? 50,

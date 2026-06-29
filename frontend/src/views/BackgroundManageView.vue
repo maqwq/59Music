@@ -63,24 +63,25 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" width="150" align="center">
+        <el-table-column label="操作" width="200" align="center">
           <template #default="{ row }">
-            <el-button
-              type="primary"
-              link
-              size="small"
-              @click.stop="handleSetDefault(row)"
-            >
-              {{ row.isDefault ? '已默认' : '设为默认' }}
-            </el-button>
-            <el-button
-              type="danger"
-              link
-              size="small"
-              @click.stop="handleDelete(row)"
-            >
-              删除
-            </el-button>
+            <div class="action-buttons">
+              <el-button
+                type="primary"
+                size="small"
+                :disabled="row.isDefault"
+                @click.stop="handleSetDefault(row)"
+              >
+                {{ row.isDefault ? '已默认' : '设为默认' }}
+              </el-button>
+              <el-button
+                type="danger"
+                size="small"
+                @click.stop="handleDelete(row)"
+              >
+                删除
+              </el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -419,6 +420,12 @@ onMounted(() => {
   border-radius: 12px;
   padding: 16px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+}
+
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
 }
 
 .thumbnail-wrapper {

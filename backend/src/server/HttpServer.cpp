@@ -972,13 +972,21 @@ void HttpServer::registerAllRoutes() {
         std::string ext = std::filesystem::path(file.filename).extension().string();
         std::string newFileName = std::to_string(timestamp) + "_" + std::filesystem::path(file.filename).stem().string() + ext;
 
+        // 获取项目根目录（从可执行文件向上两级）
+        std::filesystem::path exePath = std::filesystem::current_path();
+        std::filesystem::path projectRoot = exePath;
+        // 如果从 backend/build/Debug 启动，向上三级到项目根目录
+        if (exePath.filename() == "Debug" && exePath.parent_path().filename() == "build") {
+            projectRoot = exePath.parent_path().parent_path().parent_path();
+        }
+
         // 确定保存目录（前端 public/backgrounds）
-        std::string saveDir = "frontend/public/backgrounds";
+        std::filesystem::path saveDir = projectRoot / "frontend" / "public" / "backgrounds";
         std::error_code ec;
         std::filesystem::create_directories(saveDir, ec);
 
         // 保存文件
-        std::string savePath = saveDir + "/" + newFileName;
+        std::filesystem::path savePath = saveDir / newFileName;
         std::ofstream ofs(savePath, std::ios::binary);
         if (!ofs) {
             res.status = 500;
@@ -991,13 +999,23 @@ void HttpServer::registerAllRoutes() {
         // 返回文件路径
         Json data;
         data["fileName"] = newFileName;
-        data["filePath"] = savePath;
+        data["filePath"] = savePath.string();
         data["url"] = "/backgrounds/" + newFileName;
         res.set_content(successResponse(data).dump(), "application/json");
     });
 
-    // 静态文件服务：背景图
-    svr_->set_mount_point("/backgrounds", "frontend/public/backgrounds");
+    // 静态文件服务：背景图（使用绝对路径）
+    {
+        std::filesystem::path exePath = std::filesystem::current_path();
+        std::filesystem::path projectRoot = exePath;
+        if (exePath.filename() == "Debug" && exePath.parent_path().filename() == "build") {
+            projectRoot = exePath.parent_path().parent_path().parent_path();
+        }
+        std::filesystem::path bgDir = projectRoot / "frontend" / "public" / "backgrounds";
+        std::error_code ec;
+        std::filesystem::create_directories(bgDir, ec);
+        svr_->set_mount_point("/backgrounds", bgDir.string());
+    }
 
     // ======================== WebSocket ========================
 
