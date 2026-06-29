@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include "models/SongInfo.h"
+#include "models/BackgroundInfo.h"
 
 struct sqlite3;
 
@@ -25,6 +26,7 @@ public:
     bool open();
     void close();
     bool isOpen() const;
+    sqlite3* getDb() const { return db_; }
 
     // 歌曲 CRUD
     bool insertSong(const SongInfo& song);
@@ -55,6 +57,14 @@ public:
     bool removeSongFromPlaylist(int playlistId, int songId);
     bool reorderPlaylistSongs(int playlistId, int from, int to);
     std::vector<SongInfo> getRandomSongs(int count);
+
+    // 背景
+    bool insertBackground(const BackgroundInfo& bg);
+    std::vector<BackgroundInfo> getAllBackgrounds();
+    BackgroundInfo getBackgroundById(int id);
+    BackgroundInfo getDefaultBackground();
+    bool deleteBackground(int id);
+    bool setDefaultBackground(int id);
 
 private:
     void createTables();

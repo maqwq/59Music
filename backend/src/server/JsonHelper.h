@@ -4,6 +4,7 @@
 #include "models/SongInfo.h"
 #include "models/PlayerState.h"
 #include "models/PlayMode.h"
+#include "models/BackgroundInfo.h"
 
 namespace Music {
 
@@ -31,6 +32,28 @@ inline void from_json(const Json& j, SongInfo& s) {
     j.at("album").get_to(s.album);
     j.at("duration").get_to(s.duration);
     j.at("addedTime").get_to(s.addedTime);
+}
+
+// ============ BackgroundInfo ↔ JSON ============
+
+inline void to_json(Json& j, const BackgroundInfo& bg) {
+    j = Json{
+        {"id", bg.id},
+        {"filePath", bg.filePath},
+        {"name", bg.name},
+        {"thumbnail", bg.thumbnail},
+        {"addedTime", bg.addedTime},
+        {"isDefault", bg.isDefault}
+    };
+}
+
+inline void from_json(const Json& j, BackgroundInfo& bg) {
+    j.at("id").get_to(bg.id);
+    j.at("filePath").get_to(bg.filePath);
+    j.at("name").get_to(bg.name);
+    j.at("thumbnail").get_to(bg.thumbnail);
+    j.at("addedTime").get_to(bg.addedTime);
+    j.at("isDefault").get_to(bg.isDefault);
 }
 
 // ============ 响应构建辅助 ============

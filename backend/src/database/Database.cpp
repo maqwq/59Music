@@ -90,6 +90,18 @@ void Database::createTables() {
             UNIQUE(playlist_id, song_id)
         );
     )", nullptr, nullptr, nullptr);
+
+    // 背景表
+    sqlite3_exec(db_, R"(
+        CREATE TABLE IF NOT EXISTS backgrounds (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            file_path   TEXT NOT NULL UNIQUE,
+            name        TEXT NOT NULL DEFAULT '',
+            thumbnail   TEXT NOT NULL DEFAULT '',
+            added_time  INTEGER NOT NULL DEFAULT 0,
+            is_default  INTEGER NOT NULL DEFAULT 0
+        );
+    )", nullptr, nullptr, nullptr);
 }
 
 bool Database::executeSql(const std::string& sql) {
@@ -533,6 +545,109 @@ std::vector<SongInfo> Database::getRandomSongs(int count) {
     }
     sqlite3_finalize(stmt);
     return result;
+}
+
+// ============ 背景 ============
+
+static BackgroundInfo backgroundFromRow(sqlite3_stmt* stmt) {
+    BackgroundInfo bg;
+    bg.id        = sqlite3_column_int(stmt, 0);
+    bg.filePath  = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
+    bg.name      = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2));
+    bg.thumbnail = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3));
+    bg.addedTime = sqlite3_column_int64(stmt, 4);
+    bg.isDefault = sqlite3_column_int(stmt, 5) != 0;
+    return bg;
+}
+
+bool Database::insertBackground(const BackgroundInfo& bg) {
+    const char* sql = R"(
+        INSERT OR IGNORE INTO backgrounds (file_path, name, thumbnail, added_time, is_default)
+        VALUES (?, ?, ?, ?, ?)
+    )";
+
+    sqlite3_stmt* stmt = nullptr;
+    sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr);
+
+    sqlite3_bind_text(stmt, 1, bg.filePath.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 2, bg.name.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 3, bg.thumbnail.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int64(stmt, 4, bg.addedTime);
+    sqlite3_bind_int(stmt, 5, bg.isDefault ? 1 : 0);
+
+    int rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+
+    if (bg.isDefault) {
+        executeSql("UPDATE backgrounds SET is_default = 0 WHERE id != " + std::to_string(sqlite3_last_insert_rowid(db_)));
+    }
+
+    return rc == SQLITE_DONE;
+}
+
+std::vector<BackgroundInfo> Database::getAllBackgrounds() {
+    std::vector<BackgroundInfo> result;
+    const char* sql = "SELECT * FROM backgrounds ORDER BY is_default DESC, added_time DESC";
+    sqlite3_stmt* stmt = nullptr;
+    sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr);
+
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        result.push_back(backgroundFromRow(stmt));
+    }
+    sqlite3_finalize(stmt);
+    return result;
+}
+
+BackgroundInfo Database::getBackgroundById(int id) {
+    const char* sql = "SELECT * FROM backgrounds WHERE id = ?";
+    sqlite3_stmt* stmt = nullptr;
+    sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr);
+    sqlite3_bind_int(stmt, 1, id);
+
+    BackgroundInfo bg;
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        bg = backgroundFromRow(stmt);
+    }
+    sqlite3_finalize(stmt);
+    return bg;
+}
+
+BackgroundInfo Database::getDefaultBackground() {
+    const char* sql = "SELECT * FROM backgrounds WHERE is_default = 1 LIMIT 1";
+    sqlite3_stmt* stmt = nullptr;
+    sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr);
+
+    BackgroundInfo bg;
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        bg = backgroundFromRow(stmt);
+    }
+    sqlite3_finalize(stmt);
+    return bg;
+}
+
+bool Database::deleteBackground(int id) {
+    const char* sql = "DELETE FROM backgrounds WHERE id = ?";
+    sqlite3_stmt* stmt = nullptr;
+    sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr);
+    sqlite3_bind_int(stmt, 1, id);
+
+    int rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+
+    return rc == SQLITE_DONE && sqlite3_changes(db_) > 0;
+}
+
+bool Database::setDefaultBackground(int id) {
+    executeSql("UPDATE backgrounds SET is_default = 0");
+    const char* sql = "UPDATE backgrounds SET is_default = 1 WHERE id = ?";
+    sqlite3_stmt* stmt = nullptr;
+    sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr);
+    sqlite3_bind_int(stmt, 1, id);
+
+    int rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+
+    return rc == SQLITE_DONE && sqlite3_changes(db_) > 0;
 }
 
 } // namespace Music

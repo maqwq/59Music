@@ -605,7 +605,173 @@ GET /library/stats
 
 ---
 
-## 5. WebSocket 推送
+## 5. 背景管理 (Background)
+
+### 5.1 获取所有背景
+
+获取背景列表。
+
+```
+GET /backgrounds
+```
+
+**参数：** 无
+
+**成功响应：**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "filePath": "C:/Users/dzx/Pictures/background.jpg",
+      "name": "星空",
+      "thumbnail": "",
+      "addedTime": 1719513600,
+      "isDefault": true
+    },
+    {
+      "id": 2,
+      "filePath": "C:/Users/dzx/Pictures/music.jpg",
+      "name": "音符",
+      "thumbnail": "",
+      "addedTime": 1719513600,
+      "isDefault": false
+    }
+  ]
+}
+```
+
+---
+
+### 5.2 获取默认背景
+
+获取当前设置为默认的背景。
+
+```
+GET /backgrounds/default
+```
+
+**参数：** 无
+
+**成功响应：**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "filePath": "C:/Users/dzx/Pictures/background.jpg",
+    "name": "星空",
+    "thumbnail": "",
+    "addedTime": 1719513600,
+    "isDefault": true
+  }
+}
+```
+
+**无默认背景时：**
+```json
+{
+  "success": true,
+  "data": null
+}
+```
+
+---
+
+### 5.3 添加背景
+
+添加新的背景图片到数据库。
+
+```
+POST /backgrounds?filePath={path}&name={name}
+```
+
+**参数：**
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| filePath | string | 是 | 图片文件绝对路径 |
+| name | string | 否 | 背景名称，默认使用文件名 |
+
+**成功响应：**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 3,
+    "filePath": "C:/Users/dzx/Pictures/new_bg.jpg",
+    "name": "new_bg",
+    "thumbnail": "",
+    "addedTime": 1719513600,
+    "isDefault": false
+  }
+}
+```
+
+**错误情况：**
+- filePath 为空：`{"success": false, "msg": "缺少 filePath 参数"}`
+- 文件不存在：`{"success": false, "msg": "文件不存在或不可访问"}`
+- 路径包含 `..`：`{"success": false, "msg": "非法路径"}`
+- 背景已存在：`{"success": false, "msg": "背景已存在"}`
+
+---
+
+### 5.4 设置默认背景
+
+将指定背景设为默认背景，同时取消其他背景的默认状态。
+
+```
+POST /backgrounds/{id}/default
+```
+
+**路径参数：**
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| id | int | 背景 ID |
+
+**成功响应：**
+```json
+{
+  "success": true,
+  "data": null
+}
+```
+
+**错误情况：**
+- id 不存在：`{"success": false, "msg": "背景不存在"}`
+
+---
+
+### 5.5 删除背景
+
+从数据库中移除指定背景。
+
+```
+DELETE /backgrounds/{id}
+```
+
+**路径参数：**
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| id | int | 背景 ID |
+
+**成功响应：**
+```json
+{
+  "success": true,
+  "data": null
+}
+```
+
+**错误情况：**
+- id 不存在：`{"success": false, "msg": "背景不存在"}`
+
+---
+
+## 6. WebSocket 推送
 
 ### 5.1 连接信息
 
