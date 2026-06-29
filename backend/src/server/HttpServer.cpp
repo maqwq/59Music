@@ -887,27 +887,49 @@ void HttpServer::registerAllRoutes() {
             return;
         }
 
+        // 获取项目根目录
+        std::filesystem::path exePath = std::filesystem::current_path();
+        std::filesystem::path projectRoot = exePath;
+        if (exePath.filename() == "Debug" && exePath.parent_path().filename() == "build") {
+            projectRoot = exePath.parent_path().parent_path().parent_path();
+        }
+
+        // 判断是完整路径还是文件名
+        std::string canonical;
         std::error_code ec;
+        if (filePath.find('/') != std::string::npos || filePath.find('\\') != std::string::npos) {
+            // 完整路径
 #ifdef _WIN32
-        std::wstring wPath = utf8ToWide(filePath);
-        std::wstring wCanonical = std::filesystem::weakly_canonical(wPath, ec).wstring();
-        if (ec || !std::filesystem::exists(wCanonical, ec) || !std::filesystem::is_regular_file(wCanonical, ec)) {
-            res.status = 400;
-            res.set_content(errorResponse("文件不存在或不可访问").dump(), "application/json");
-            return;
-        }
-        int wideLen = static_cast<int>(wCanonical.size());
-        int utf8Len = WideCharToMultiByte(CP_UTF8, 0, wCanonical.c_str(), wideLen, nullptr, 0, nullptr, nullptr);
-        std::string canonical(utf8Len, '\0');
-        WideCharToMultiByte(CP_UTF8, 0, wCanonical.c_str(), wideLen, &canonical[0], utf8Len, nullptr, nullptr);
+            std::wstring wPath = utf8ToWide(filePath);
+            std::wstring wCanonical = std::filesystem::weakly_canonical(wPath, ec).wstring();
+            if (ec || !std::filesystem::exists(wCanonical, ec) || !std::filesystem::is_regular_file(wCanonical, ec)) {
+                res.status = 400;
+                res.set_content(errorResponse("文件不存在或不可访问").dump(), "application/json");
+                return;
+            }
+            int wideLen = static_cast<int>(wCanonical.size());
+            int utf8Len = WideCharToMultiByte(CP_UTF8, 0, wCanonical.c_str(), wideLen, nullptr, 0, nullptr, nullptr);
+            canonical.resize(utf8Len, '\0');
+            WideCharToMultiByte(CP_UTF8, 0, wCanonical.c_str(), wideLen, &canonical[0], utf8Len, nullptr, nullptr);
 #else
-        std::string canonical = std::filesystem::weakly_canonical(filePath, ec).string();
-        if (ec || !std::filesystem::exists(canonical) || !std::filesystem::is_regular_file(canonical)) {
-            res.status = 400;
-            res.set_content(errorResponse("文件不存在或不可访问").dump(), "application/json");
-            return;
-        }
+            canonical = std::filesystem::weakly_canonical(filePath, ec).string();
+            if (ec || !std::filesystem::exists(canonical) || !std::filesystem::is_regular_file(canonical)) {
+                res.status = 400;
+                res.set_content(errorResponse("文件不存在或不可访问").dump(), "application/json");
+                return;
+            }
 #endif
+        } else {
+            // 文件名，拼接完整路径
+            std::filesystem::path bgDir = projectRoot / "frontend" / "public" / "backgrounds";
+            std::filesystem::path fullPath = bgDir / filePath;
+            if (!std::filesystem::exists(fullPath, ec) || !std::filesystem::is_regular_file(fullPath, ec)) {
+                res.status = 400;
+                res.set_content(errorResponse("文件不存在或不可访问").dump(), "application/json");
+                return;
+            }
+            canonical = filePath;  // 只保存文件名
+        }
 
         if (name.empty()) {
             name = std::filesystem::path(canonical).filename().string();
