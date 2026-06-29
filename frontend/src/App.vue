@@ -649,9 +649,10 @@ onMounted(async () => {
   --bg-image: none;
   --bg-size: cover;
   --bg-repeat: no-repeat;
-  --sidebar-opacity: 1;
-  --content-opacity: 1;
-  --playerbar-opacity: 1;
+  --sidebar-bg: rgba(30, 30, 45, 1);
+  --content-bg: rgba(248, 249, 252, 1);
+  --playerbar-bg: rgba(255, 255, 255, 1);
+  --playerbar-bg-end: rgba(250, 251, 252, 1);
 }
 
 /* ===== 全局样式 ===== */
@@ -706,23 +707,23 @@ html, body {
 
   /* 侧边栏透明度 */
   .sidebar {
-    background-color: rgba(30, 30, 45, var(--sidebar-opacity)) !important;
+    background-color: var(--sidebar-bg) !important;
   }
 
   /* 工作区透明度 */
   .main-area {
-    background-color: rgba(248, 249, 252, var(--content-opacity)) !important;
+    background-color: var(--content-bg) !important;
   }
 
   .content {
-    background-color: rgba(248, 249, 252, var(--content-opacity)) !important;
+    background-color: var(--content-bg) !important;
   }
 
   /* 底部播放栏透明度 */
   .player-bar {
     background: linear-gradient(180deg,
-      rgba(255, 255, 255, var(--playerbar-opacity)) 0%,
-      rgba(250, 251, 252, var(--playerbar-opacity)) 100%) !important;
+      var(--playerbar-bg) 0%,
+      var(--playerbar-bg-end) 100%) !important;
   }
 }
 </style>

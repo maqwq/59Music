@@ -221,14 +221,16 @@ export const useBackgroundStore = defineStore('background', () => {
     document.documentElement.style.setProperty('--bg-size', bgSize)
     document.documentElement.style.setProperty('--bg-repeat', bgRepeat)
 
-    // 设置透明度
+    // 设置透明度（将透明度值应用到 CSS 变量中，使用 rgba 格式）
     const sidebarOpacity = (bg.sidebarOpacity ?? 50) / 100
     const contentOpacity = (bg.contentOpacity ?? 50) / 100
     const playerBarOpacity = (bg.playerBarOpacity ?? 50) / 100
 
-    document.documentElement.style.setProperty('--sidebar-opacity', String(sidebarOpacity))
-    document.documentElement.style.setProperty('--content-opacity', String(contentOpacity))
-    document.documentElement.style.setProperty('--playerbar-opacity', String(playerBarOpacity))
+    // 使用 rgba 颜色值，而不是单独的透明度变量
+    document.documentElement.style.setProperty('--sidebar-bg', `rgba(30, 30, 45, ${sidebarOpacity})`)
+    document.documentElement.style.setProperty('--content-bg', `rgba(248, 249, 252, ${contentOpacity})`)
+    document.documentElement.style.setProperty('--playerbar-bg', `rgba(255, 255, 255, ${playerBarOpacity})`)
+    document.documentElement.style.setProperty('--playerbar-bg-end', `rgba(250, 251, 252, ${playerBarOpacity})`)
 
     // 添加背景启用类
     document.documentElement.classList.add('custom-background-enabled')
@@ -239,9 +241,10 @@ export const useBackgroundStore = defineStore('background', () => {
     document.documentElement.style.removeProperty('--bg-image')
     document.documentElement.style.removeProperty('--bg-size')
     document.documentElement.style.removeProperty('--bg-repeat')
-    document.documentElement.style.removeProperty('--sidebar-opacity')
-    document.documentElement.style.removeProperty('--content-opacity')
-    document.documentElement.style.removeProperty('--playerbar-opacity')
+    document.documentElement.style.removeProperty('--sidebar-bg')
+    document.documentElement.style.removeProperty('--content-bg')
+    document.documentElement.style.removeProperty('--playerbar-bg')
+    document.documentElement.style.removeProperty('--playerbar-bg-end')
     document.documentElement.classList.remove('custom-background-enabled')
   }
 
