@@ -12,7 +12,6 @@
         :default-active="sidebarActive"
         router
         class="nav-menu"
-        background-color="#1e1e2d"
         text-color="#a0a0b8"
         active-text-color="#ffffff"
       >
@@ -744,6 +743,7 @@ html, body {
 .nav-menu {
   flex: 0 0 auto;
   border-right: none !important;
+  background-color: var(--sidebar-bg, #1e1e2d) !important;
 }
 
 .nav-menu :deep(.el-menu-item) {
