@@ -90,6 +90,11 @@ pnpm-debug.log*
 .env.*.local
 
 # =========================
+# Background images (用户自定义背景图)
+# =========================
+frontend/public/backgrounds/
+
+# =========================
 # Temporary & test files
 # =========================
 tmp/
