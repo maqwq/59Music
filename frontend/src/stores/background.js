@@ -118,10 +118,10 @@ export const useBackgroundStore = defineStore('background', () => {
       name: file.name.replace(/\.[^/.]+$/, ''), // 去掉扩展名作为名称
     })
 
-    if (res.data) {
+    if (res) {
       // 添加到列表
       backgrounds.value.push({
-        ...res.data,
+        ...res,
         displayMode: 'cover',
         sidebarOpacity: 50,
         contentOpacity: 50,
@@ -130,7 +130,7 @@ export const useBackgroundStore = defineStore('background', () => {
       saveSettings()
     }
 
-    return res.data
+    return res
   }
 
   // 删除背景图
