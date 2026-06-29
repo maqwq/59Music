@@ -8,6 +8,7 @@
 #include "models/BackgroundInfo.h"
 
 #include <httplib.h>
+#include <sqlite3.h>
 #include <iostream>
 #include <chrono>
 #include <filesystem>

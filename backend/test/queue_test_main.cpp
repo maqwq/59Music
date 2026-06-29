@@ -9,17 +9,27 @@
 #include <iostream>
 #include <cassert>
 #include <string>
+#include <map>
 
 using Music::SongInfo;
 
 // ─── 辅助函数 ──────────────────────────────────────────────
+
+static std::map<int, SongInfo> songDb;
 
 static SongInfo makeSong(int id, const std::string& title) {
     SongInfo s;
     s.id = id;
     s.title = title;
     s.filePath = "D:/Music/" + title + ".mp3";
+    songDb[id] = s;
     return s;
+}
+
+static SongInfo resolveSong(int songId) {
+    auto it = songDb.find(songId);
+    if (it != songDb.end()) return it->second;
+    return SongInfo{};
 }
 
 static void printResult(const std::string& name, bool ok) {
@@ -39,21 +49,22 @@ int main() {
     std::cout << "=== PlayQueue 测试 ===\n" << std::endl;
 
     // 准备测试用歌曲
-    std::vector<SongInfo> songs;
     for (int i = 1; i <= 5; ++i) {
-        songs.push_back(makeSong(i, "Song" + std::to_string(i)));
+        makeSong(i, "Song" + std::to_string(i));
     }
+    std::vector<int> songIds = {1, 2, 3, 4, 5};
 
     // ─── 1. 基础队列操作 ───────────────────────────────
     std::cout << "--- 1. 基础队列操作 ---" << std::endl;
     {
         PlayQueue q;
+        q.setSongResolver(resolveSong);
         TEST("新建队列为空", q.isEmpty());
         TEST("size=0", q.size() == 0);
         TEST("current 为 null", !q.current().has_value());
         TEST("currentIndex=-1", q.getCurrentIndex() == -1);
 
-        q.addSongs(songs);
+        q.addSongs(songIds);
         TEST("添加5首歌后不为空", !q.isEmpty());
         TEST("size=5", q.size() == 5);
         TEST("自动指向第一首", q.getCurrentIndex() == 0);
@@ -72,21 +83,23 @@ int main() {
     std::cout << "\n--- 2. 队列排序 (reorder) ---" << std::endl;
     {
         PlayQueue q;
-        q.addSongs(songs);
+        q.setSongResolver(resolveSong);
+        q.addSongs(songIds);
 
         // [Song1, Song2, Song3, Song4, Song5] -> 移 Song5 到 Song1 前
         q.reorder(4, 0);
-        const auto& queue = q.getQueue();
-        TEST("Song5 移到第1位", queue[0].title == "Song5");
-        TEST("Song1 移到第2位", queue[1].title == "Song1");
-        TEST("Song4 移到第5位", queue[4].title == "Song4");
+        const auto& items = q.getItems();
+        TEST("Song5 移到第1位", items[0].songId == 5);
+        TEST("Song1 移到第2位", items[1].songId == 1);
+        TEST("Song4 移到第5位", items[4].songId == 4);
     }
 
     // ─── 3. Sequential 模式 ──────────────────────────
     std::cout << "\n--- 3. Sequential 模式 ---" << std::endl;
     {
         PlayQueue q;
-        q.addSongs(songs);
+        q.setSongResolver(resolveSong);
+        q.addSongs(songIds);
         q.setPlayMode(PlayMode::Sequential);
 
         // 从第1首开始
@@ -111,7 +124,8 @@ int main() {
     std::cout << "\n--- 4. SingleLoop 模式 ---" << std::endl;
     {
         PlayQueue q;
-        q.addSongs(songs);
+        q.setSongResolver(resolveSong);
+        q.addSongs(songIds);
         q.setCurrentIndex(2);
         q.setPlayMode(PlayMode::SingleLoop);
 
@@ -129,7 +143,8 @@ int main() {
     std::cout << "\n--- 5. ListLoop 模式 ---" << std::endl;
     {
         PlayQueue q;
-        q.addSongs(songs);
+        q.setSongResolver(resolveSong);
+        q.addSongs(songIds);
         q.setPlayMode(PlayMode::ListLoop);
 
         // 从 Song1 开始，跳转到最后一首
@@ -145,7 +160,8 @@ int main() {
     std::cout << "\n--- 6. Shuffle 模式 ---" << std::endl;
     {
         PlayQueue q;
-        q.addSongs(songs);
+        q.setSongResolver(resolveSong);
+        q.addSongs(songIds);
         q.setCurrentIndex(0);
         q.setPlayMode(PlayMode::Shuffle);
 
@@ -172,7 +188,8 @@ int main() {
     std::cout << "\n--- 7. 模式切换 ---" << std::endl;
     {
         PlayQueue q;
-        q.addSongs(songs);
+        q.setSongResolver(resolveSong);
+        q.addSongs(songIds);
         q.setCurrentIndex(0);
 
         q.setPlayMode(PlayMode::ListLoop);
