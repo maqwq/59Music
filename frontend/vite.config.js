@@ -11,6 +11,10 @@ export default defineConfig({
         target: 'http://localhost:1059',
         changeOrigin: true,
       },
+      '/backgrounds': {
+        target: 'http://localhost:1059',
+        changeOrigin: true,
+      },
       '/ws': {
         target: 'ws://localhost:1059',
         ws: true,
