@@ -87,12 +87,11 @@
         </div>
       </div>
 
-      <!-- 底部快捷键提示 -->
+      <!-- 底部设置按钮 -->
       <div class="sidebar-footer">
-        <div class="shortcut-hint">
-          <div class="hint-row"><kbd>Space</kbd> 播放/暂停</div>
-          <div class="hint-row"><kbd>← →</kbd> 切歌</div>
-          <div class="hint-row"><kbd>↑ ↓</kbd> 音量</div>
+        <div class="settings-btn" @click="$router.push('/settings')">
+          <el-icon size="18"><Setting /></el-icon>
+          <span>设置</span>
         </div>
       </div>
     </el-aside>
@@ -334,6 +333,7 @@ import Sortable from 'sortablejs'
 import { useRoute, useRouter } from 'vue-router'
 import { usePlayerStore } from './stores/player'
 import { usePlaylistStore } from './stores/playlist'
+import { useBackgroundStore } from './stores/background'
 import { useWebSocket } from './composables/useWebSocket'
 import { useKeyboard } from './composables/useKeyboard'
 import { removeFromQueue, clearQueue, reorderQueue } from './api/queue'
@@ -358,6 +358,7 @@ import {
   Plus,
   Edit,
   Delete,
+  Setting,
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
@@ -365,6 +366,7 @@ const route = useRoute()
 const router = useRouter()
 const playerStore = usePlayerStore()
 const playlistStore = usePlaylistStore()
+const backgroundStore = useBackgroundStore()
 
 // ===== 播放列表抽屉 =====
 const queueDrawerVisible = ref(false)
@@ -627,6 +629,9 @@ onMounted(async () => {
   await playerStore.refreshQueue()
   await playlistStore.ensureFavoritePlaylist()
 
+  // 加载背景图设置
+  await backgroundStore.fetchBackgrounds()
+
   // 兜底：如果 WebSocket 连不上，用本地 tick 模拟进度
   let tickTimer = null
   const unwatch = watch(connected, (isConnected) => {
@@ -639,6 +644,16 @@ onMounted(async () => {
 </script>
 
 <style>
+/* ===== CSS 变量（背景图相关）===== */
+:root {
+  --bg-image: none;
+  --bg-size: cover;
+  --bg-repeat: no-repeat;
+  --sidebar-opacity: 1;
+  --content-opacity: 1;
+  --playerbar-opacity: 1;
+}
+
 /* ===== 全局样式 ===== */
 html, body {
   margin: 0;
@@ -670,6 +685,45 @@ html, body {
 /* Element Plus 表格行 hover 优化 */
 .el-table__body tr:hover > td {
   background-color: #f0f2ff !important;
+}
+
+/* ===== 背景图应用样式 ===== */
+.custom-background-enabled {
+  /* 整体背景图 */
+  .app-layout::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: var(--bg-image);
+    background-size: var(--bg-size);
+    background-repeat: var(--bg-repeat);
+    background-position: center;
+    z-index: -1;
+  }
+
+  /* 侧边栏透明度 */
+  .sidebar {
+    background-color: rgba(30, 30, 45, var(--sidebar-opacity)) !important;
+  }
+
+  /* 工作区透明度 */
+  .main-area {
+    background-color: rgba(248, 249, 252, var(--content-opacity)) !important;
+  }
+
+  .content {
+    background-color: rgba(248, 249, 252, var(--content-opacity)) !important;
+  }
+
+  /* 底部播放栏透明度 */
+  .player-bar {
+    background: linear-gradient(180deg,
+      rgba(255, 255, 255, var(--playerbar-opacity)) 0%,
+      rgba(250, 251, 252, var(--playerbar-opacity)) 100%) !important;
+  }
 }
 </style>
 
@@ -897,31 +951,21 @@ html, body {
   border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-.shortcut-hint {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.hint-row {
-  font-size: 11px;
-  color: #6a6a7a;
+.settings-btn {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #a0a0b8;
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
-.hint-row kbd {
-  display: inline-block;
-  padding: 1px 6px;
-  font-size: 10px;
-  font-family: inherit;
-  color: #8a8a9a;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 3px;
-  min-width: 24px;
-  text-align: center;
+.settings-btn:hover {
+  background-color: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
 }
 
 /* ===== 主内容区 ===== */

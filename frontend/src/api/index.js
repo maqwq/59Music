@@ -8,4 +8,5 @@
 export * as playerApi from './player'
 export * as queueApi from './queue'
 export * as libraryApi from './library'
+export * as backgroundApi from './background'
 export { USE_MOCK } from './request'

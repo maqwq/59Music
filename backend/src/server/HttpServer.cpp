@@ -949,6 +949,56 @@ void HttpServer::registerAllRoutes() {
         res.set_content(successResponse(nullptr).dump(), "application/json");
     }));
 
+    // ======================== 文件上传 API ========================
+
+    svr_->Post("/api/v1/upload/background", [this](const httplib::Request& req, httplib::Response& res) {
+        // 检查是否有文件
+        if (!req.form.has_file("file")) {
+            res.status = 400;
+            res.set_content(errorResponse("缺少文件").dump(), "application/json");
+            return;
+        }
+
+        auto file = req.form.get_file("file");
+        if (file.filename.empty()) {
+            res.status = 400;
+            res.set_content(errorResponse("缺少文件").dump(), "application/json");
+            return;
+        }
+
+        // 生成唯一文件名
+        auto now = std::chrono::system_clock::now();
+        auto timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
+        std::string ext = std::filesystem::path(file.filename).extension().string();
+        std::string newFileName = std::to_string(timestamp) + "_" + std::filesystem::path(file.filename).stem().string() + ext;
+
+        // 确定保存目录（前端 public/backgrounds）
+        std::string saveDir = "frontend/public/backgrounds";
+        std::error_code ec;
+        std::filesystem::create_directories(saveDir, ec);
+
+        // 保存文件
+        std::string savePath = saveDir + "/" + newFileName;
+        std::ofstream ofs(savePath, std::ios::binary);
+        if (!ofs) {
+            res.status = 500;
+            res.set_content(errorResponse("保存文件失败").dump(), "application/json");
+            return;
+        }
+        ofs.write(file.content.data(), file.content.size());
+        ofs.close();
+
+        // 返回文件路径
+        Json data;
+        data["fileName"] = newFileName;
+        data["filePath"] = savePath;
+        data["url"] = "/backgrounds/" + newFileName;
+        res.set_content(successResponse(data).dump(), "application/json");
+    });
+
+    // 静态文件服务：背景图
+    svr_->set_mount_point("/backgrounds", "frontend/public/backgrounds");
+
     // ======================== WebSocket ========================
 
     svr_->WebSocket("/ws", [this](const httplib::Request&, httplib::ws::WebSocket& ws) {
