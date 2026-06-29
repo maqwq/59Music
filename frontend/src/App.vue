@@ -704,27 +704,6 @@ html, body {
     background-position: center;
     z-index: -1;
   }
-
-  /* 侧边栏透明度 */
-  .sidebar {
-    background-color: var(--sidebar-bg) !important;
-  }
-
-  /* 工作区透明度 */
-  .main-area {
-    background-color: var(--content-bg) !important;
-  }
-
-  .content {
-    background-color: var(--content-bg) !important;
-  }
-
-  /* 底部播放栏透明度 */
-  .player-bar {
-    background: linear-gradient(180deg,
-      var(--playerbar-bg) 0%,
-      var(--playerbar-bg-end) 100%) !important;
-  }
 }
 </style>
 
@@ -736,7 +715,7 @@ html, body {
 
 /* ===== 深色侧边栏 ===== */
 .sidebar {
-  background-color: #1e1e2d;
+  background-color: var(--sidebar-bg, #1e1e2d);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -973,13 +952,13 @@ html, body {
 .main-area {
   display: flex;
   flex-direction: column;
-  background-color: #f8f9fc;
+  background-color: var(--content-bg, #f8f9fc);
 }
 
 .content {
   flex: 1;
   overflow: auto;
-  background-color: #f8f9fc;
+  background-color: var(--content-bg, #f8f9fc);
 }
 
 /* ===== 底部播放栏（玻璃态） ===== */
@@ -988,7 +967,7 @@ html, body {
   align-items: center;
   justify-content: space-between;
   padding: 0 28px;
-  background: linear-gradient(180deg, #ffffff 0%, #fafbfc 100%);
+  background: linear-gradient(180deg, var(--playerbar-bg, #ffffff) 0%, var(--playerbar-bg-end, #fafbfc) 100%);
   border-top: 1px solid #ebeef5;
   box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.04);
   backdrop-filter: blur(8px);
