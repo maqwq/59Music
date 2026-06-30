@@ -60,6 +60,27 @@ export function addPlaylistToQueue(playlistId) {
   return request.post('/queue/add-playlist', { playlistId })
 }
 
+/** 播放全部歌单（清空队列 + 加入歌单 + 立即播放） */
+export function playPlaylist(playlistId) {
+  if (USE_MOCK) {
+    return delay().then(() => {
+      // 清空并替换为歌单歌曲
+      const playlistSongIds = [2, 3, 4]
+      mockItems = []
+      let added = 0
+      for (const id of playlistSongIds) {
+        const song = mockSongs.find(s => s.id === id)
+        if (song) {
+          mockItems.push({ type: 'song', songId: id, song })
+          added++
+        }
+      }
+      return { added, skipped: playlistSongIds.length - added }
+    })
+  }
+  return request.post('/queue/play-playlist', { playlistId })
+}
+
 /** 移除队列中指定索引的项 */
 export function removeFromQueue(index) {
   if (USE_MOCK) {

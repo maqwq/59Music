@@ -537,6 +537,50 @@ void HttpServer::registerAllRoutes() {
         wsBroadcastQueueChanged();
     }));
 
+    // POST /queue/play-playlist — 替换队列为歌单歌曲并立即播放
+    svr_->Post("/api/v1/queue/play-playlist", wrap([this](const httplib::Request& req, httplib::Response& res) {
+        std::lock_guard lock(stateMutex_);
+        auto body = Json::parse(req.body, nullptr, false);
+        if (body.is_discarded() || !body.contains("playlistId")) {
+            res.status = 400;
+            res.set_content(errorResponse("请求体格式错误").dump(), "application/json");
+            return;
+        }
+        int playlistId = body["playlistId"].get<int>();
+        auto info = db_->getPlaylistById(playlistId);
+        if (info.id == 0) {
+            res.status = 404;
+            res.set_content(errorResponse("歌单不存在").dump(), "application/json");
+            return;
+        }
+        auto songs = db_->getPlaylistSongs(playlistId);
+        if (songs.empty()) {
+            res.status = 400;
+            res.set_content(errorResponse("歌单没有歌曲").dump(), "application/json");
+            return;
+        }
+        // 停止当前播放，清空队列
+        stopCurrentSong();
+        queue_->clear();
+        // 加入歌单全部歌曲
+        std::vector<int> songIds;
+        for (auto& s : songs) songIds.push_back(s.id);
+        int added = queue_->addSongs(songIds);
+        int skipped = static_cast<int>(songIds.size()) - added;
+        // 从第一首开始播放
+        queue_->setCurrentIndex(0);
+        auto first = songs.front();
+        engine_->play(first.filePath);
+        pausedByUser_ = false;
+        wasPlaying_ = true;
+        res.set_content(successResponse({
+            {"added", added},
+            {"skipped", skipped}
+        }).dump(), "application/json");
+        wsBroadcastQueueChanged();
+        wsBroadcastPlayerState();
+    }));
+
     // DELETE /queue/{index} — cpp-httplib 用正则捕获
     svr_->Delete("/api/v1/queue/(\\d+)", wrap([this](const httplib::Request& req, httplib::Response& res) {
         std::lock_guard lock(stateMutex_);

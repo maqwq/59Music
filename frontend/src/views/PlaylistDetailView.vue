@@ -27,8 +27,11 @@
           <span>{{ store.current.songCount || 0 }} 首歌</span>
         </div>
         <div class="hero-actions">
+          <el-button type="success" size="large" @click="handlePlayAll" :disabled="!store.current?.songCount">
+            <el-icon><VideoPlay /></el-icon> 播放全部
+          </el-button>
           <el-button type="primary" size="large" @click="handleAddToQueue" :disabled="!store.current?.songCount">
-            <el-icon><VideoPlay /></el-icon> 加入队列
+            加入队列
           </el-button>
           <el-button v-if="store.current?.name !== '我喜欢'" type="danger" plain size="large" @click="handleDeletePlaylist">
             删除歌单
@@ -97,7 +100,7 @@ import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { usePlaylistStore } from '../stores/playlist'
 import { usePlayerStore } from '../stores/player'
-import { addPlaylistToQueue } from '../api/queue'
+import { addPlaylistToQueue, playPlaylist } from '../api/queue'
 import { ArrowLeft, VideoPlay, Delete, Star, StarFilled } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useSortableRows } from '../composables/useSortableRows'
@@ -160,6 +163,16 @@ async function handleToggleFavorite(song) {
     ElMessage.success(isFav ? `已收藏「${song.title}」` : `已取消收藏「${song.title}」`)
   } catch {
     ElMessage.error('操作失败')
+  }
+}
+
+async function handlePlayAll() {
+  const result = await playPlaylist(playlistId.value)
+  await playerStore.refreshQueue()
+  if (result && result.skipped > 0) {
+    ElMessage.success(`正在播放歌单 "${store.current?.name}"（${result.added}首，${result.skipped}首已在队列中）`)
+  } else {
+    ElMessage.success(`正在播放歌单 "${store.current?.name}"`)
   }
 }
 
