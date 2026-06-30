@@ -525,10 +525,14 @@ void HttpServer::registerAllRoutes() {
             res.set_content(errorResponse("歌单不存在").dump(), "application/json");
             return;
         }
-        queue_->addPlaylist(playlistId, info.name);
+        auto songs = db_->getPlaylistSongs(playlistId);
+        std::vector<int> songIds;
+        for (auto& s : songs) songIds.push_back(s.id);
+        int added = queue_->addSongs(songIds);
+        int skipped = static_cast<int>(songIds.size()) - added;
         res.set_content(successResponse({
-            {"playlistId", playlistId},
-            {"playlistName", info.name}
+            {"added", added},
+            {"skipped", skipped}
         }).dump(), "application/json");
         wsBroadcastQueueChanged();
     }));
@@ -846,9 +850,15 @@ void HttpServer::registerAllRoutes() {
             return;
         }
         auto songs = db_->getPlaylistSongs(id);
-        queue_->addPlaylist(id, info.name);
+        std::vector<int> songIds;
+        for (auto& s : songs) songIds.push_back(s.id);
+        int added = queue_->addSongs(songIds);
+        int skipped = static_cast<int>(songIds.size()) - added;
         wsBroadcastQueueChanged();
-        res.set_content(successResponse({{"addedCount", static_cast<int>(songs.size())}}).dump(), "application/json");
+        res.set_content(successResponse({
+            {"added", added},
+            {"skipped", skipped}
+        }).dump(), "application/json");
     }));
 
     // ======================== 背景 API ========================

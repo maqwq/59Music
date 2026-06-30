@@ -37,17 +37,24 @@ export function addToQueue(songIds) {
   return request.post('/queue/add', { songIds })
 }
 
-/** 将歌单加入队列（歌单引用） */
+/** 将歌单歌曲加入队列（拆开为单首，走 dedup） */
 export function addPlaylistToQueue(playlistId) {
   if (USE_MOCK) {
     return delay().then(() => {
-      mockItems.push({
-        type: 'playlist',
-        playlistId,
-        playlistName: `歌单 ${playlistId}`,
-        songs: [mockSongs[0]],
-      })
-      return null
+      // 模拟歌单的歌曲（实际应从 mock playlists 获取，这里简化处理）
+      const playlistSongIds = [2, 3, 4] // 模拟歌单含歌曲 2,3,4
+      let added = 0
+      for (const id of playlistSongIds) {
+        const exists = mockItems.some(item => item.type === 'song' && item.songId === id)
+        if (!exists) {
+          const song = mockSongs.find(s => s.id === id)
+          if (song) {
+            mockItems.push({ type: 'song', songId: id, song })
+            added++
+          }
+        }
+      }
+      return { added, skipped: playlistSongIds.length - added }
     })
   }
   return request.post('/queue/add-playlist', { playlistId })

@@ -166,7 +166,11 @@ async function handleToggleFavorite(song) {
 async function handleAddToQueue() {
   const result = await addPlaylistToQueue(playlistId.value)
   await playerStore.refreshQueue()
-  ElMessage.success(`已将歌单 "${store.current?.name}" 加入队列`)
+  if (result && result.skipped > 0) {
+    ElMessage.success(`已将歌单 "${store.current?.name}" 加入队列（新增${result.added}首，跳过${result.skipped}首重复）`)
+  } else {
+    ElMessage.success(`已将歌单 "${store.current?.name}" 全部加入队列`)
+  }
 }
 
 async function handleDeletePlaylist() {
