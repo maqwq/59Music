@@ -338,6 +338,7 @@ void HttpServer::registerAllRoutes() {
         wasPlaying_ = true;
         res.set_content(successResponse(nullptr).dump(), "application/json");
         wsBroadcastPlayerState();
+        wsBroadcastQueueChanged();
     }));
 
     svr_->Post("/api/v1/player/toggle", wrap([this](const httplib::Request&, httplib::Response& res) {
