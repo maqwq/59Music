@@ -133,39 +133,3 @@ add_executable(gen_test_wav
     test/gen_test_wav.cpp
 )
 
-# ============ P3: HTTP 服务 ============
-
-add_executable(59music_server
-    src/main.cpp
-    src/database/Database.h
-    src/database/Database.cpp
-    src/scanner/FileScanner.h
-    src/scanner/FileScanner.cpp
-    src/scanner/MetadataParser.h
-    src/scanner/MetadataParser.cpp
-    src/scanner/LibraryManager.h
-    src/scanner/LibraryManager.cpp
-    src/player/PlayerEngine.h
-    src/player/PlayerEngine.cpp
-    src/player/PlayQueue.h
-    src/player/PlayQueue.cpp
-    src/player/AudioDecoder.h
-    src/player/AudioDecoder.cpp
-    src/models/SongInfo.h
-    src/models/PlayerState.h
-    src/models/PlayMode.h
-    src/models/BackgroundInfo.h
-    ${MINIAUDIO_IMPL}
-    src/server/HttpServer.h
-    src/server/HttpServer.cpp
-    src/server/JsonHelper.h
-)
-
-target_link_libraries(59music_server PRIVATE
-    sqlite3
-    tag
-    nlohmann_json
-    httplib
-    ${MINIAUDIO_LIBS}
-    ws2_32
-)
