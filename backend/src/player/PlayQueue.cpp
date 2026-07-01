@@ -235,7 +235,9 @@ std::optional<SongInfo> PlayQueue::next() {
             shufflePos_++;
             if (shufflePos_ >= static_cast<int>(shuffleOrder_.size())) {
                 regenerateShuffleOrder();
-                shufflePos_ = 0;
+                // regenerateShuffleOrder 会将 currentIndex_ 换到 shuffleOrder_[0]，
+                // 避免新一轮首首歌与刚播完的歌重复：多首时从位置 1 开始，单首时保留 0。
+                shufflePos_ = (static_cast<int>(shuffleOrder_.size()) > 1) ? 1 : 0;
             }
             nextItemIdx = shuffleOrder_[shufflePos_];
             break;
